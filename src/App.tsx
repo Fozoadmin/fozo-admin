@@ -3,8 +3,10 @@ import Login from "@/pages/Login"
 import Dashboard from "@/pages/Dashboard"
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const authed = localStorage.getItem("auth") === "1"
-  return authed ? <>{children}</> : <Navigate to="/login" replace />
+  const authToken = localStorage.getItem("auth_token")
+  const authFlag = localStorage.getItem("auth") === "1"
+  const isAuthenticated = authToken && authFlag
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />
 }
 
 export default function App() {

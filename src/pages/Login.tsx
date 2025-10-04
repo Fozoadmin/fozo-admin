@@ -9,16 +9,42 @@ export default function Login() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const u = import.meta.env.VITE_APP_USERNAME
-    const p = import.meta.env.VITE_APP_PASSWORD
-    if (username === u && password === p) {
-      localStorage.setItem("auth", "1")
-      nav("/dashboard")
-    } else {
-      setError("Invalid username or password")
+    setError(null)
+    setLoading(true)
+
+    try {
+      const response = await fetch(`http://localhost:3000/fozo/api/auth/login-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'srxdtcfy14Eguy5212hijbswd7iobhvinoqhd78gq2r74oh809h9TFR76GDH83csyHQ9DH3H8EH9Q'
+        },
+        body: JSON.stringify({
+          identifier: username,
+          password: password
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        // Store auth token and user info
+        localStorage.setItem("auth_token", data.token)
+        localStorage.setItem("user", JSON.stringify(data.user))
+        localStorage.setItem("auth", "1")
+        nav("/dashboard")
+      } else {
+        console.error('Login error:', data)
+        setError(data.message || "Invalid username or password")
+      }
+    } catch (err) {
+      setError("Network error. Please try again.")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -50,7 +76,9 @@ export default function Login() {
               />
             </div>
             {error && <div className="text-sm text-red-600">{error}</div>}
-            <Button type="submit" className="mt-1">Sign in</Button>
+            <Button type="submit" className="mt-1" disabled={loading}>
+              {loading ? "Signing in..." : "Sign in"}
+            </Button>
           </form>
         </CardContent>
       </Card>

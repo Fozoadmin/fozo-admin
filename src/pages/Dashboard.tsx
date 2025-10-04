@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -9,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -50,6 +51,7 @@ import {
   Filter,
   ChevronRight,
   ChevronLeft,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
 
@@ -138,8 +140,16 @@ function StatCard({ icon: Icon, title, value, suffix="", delta, className = "" }
   );
 }
 
-type TopBarProps = { onSearch?: (q: string) => void };
-function TopBar({ onSearch } : TopBarProps) {
+function TopBar() {
+  const navigate = useNavigate();
+  
+  const handleLogout = () => {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("auth");
+    navigate("/login");
+  };
+
   return (
     <div className="h-16 flex items-center justify-between border-b px-4 lg:px-6 bg-background/60 backdrop-blur">
       <div className="flex items-center gap-2 text-xl font-semibold">
@@ -149,7 +159,7 @@ function TopBar({ onSearch } : TopBarProps) {
       <div className="flex items-center gap-2 w-full max-w-xl">
         <div className="relative flex-1">
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input onChange={(e)=>onSearch?.(e.target.value)} placeholder="Search orders, restaurants, riders..." className="pl-9" />
+          <Input placeholder="Search orders, restaurants, riders..." className="pl-9" />
         </div>
         <Dialog>
           <DialogTrigger asChild>
@@ -175,6 +185,10 @@ function TopBar({ onSearch } : TopBarProps) {
             </div>
           </DialogContent>
         </Dialog>
+        <Button variant="outline" onClick={handleLogout} className="gap-2">
+          <LogOut className="h-4 w-4" />
+          Logout
+        </Button>
       </div>
     </div>
   );
@@ -476,12 +490,11 @@ function Placeholder({ title }: PlaceholderProps) {
 
 export default function Dashboard() {
   const [active, setActive] = useState("overview");
-  const [query, setQuery] = useState("");
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 text-foreground">
       {/* Top Bar */}
-      <TopBar onSearch={setQuery} />
+      <TopBar />
 
       <div className="max-w-[1400px] mx-auto grid grid-cols-1 md:grid-cols-[16rem_1fr] gap-0">
         {/* Sidebar */}
