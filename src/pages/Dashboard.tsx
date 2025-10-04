@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { adminApi } from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -43,37 +44,14 @@ import {
   Bike,
   Users,
   IndianRupee,
-  Megaphone,
-  LifeBuoy,
-  Settings,
   Search,
   Plus,
   Filter,
-  ChevronRight,
-  ChevronLeft,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
 
-// --- Mock Data Generators ---
-const cities = ["Mumbai", "Bengaluru", "Delhi", "Hyderabad", "Pune", "Chennai"];
-const cuisines = ["North Indian", "South Indian", "Chinese", "Italian", "Desserts", "Fast Food"];
-
-const makeOrders = (n = 15) =>
-  Array.from({ length: n }, (_, i) => ({
-    id: `ORD-${10000 + i}`,
-    customer: ["Aarav", "Vihaan", "Ananya", "Isha", "Kabir", "Tara"][i % 6],
-    restaurant: ["Spice Route", "Urban Dosa", "Dragon Bowl", "Bombay Bites"][i % 4],
-    city: cities[i % cities.length],
-    items: Math.ceil(Math.random() * 5) + 1,
-    value: Math.round(150 + Math.random() * 850),
-    status: ["Placed", "Preparing", "On the way", "Delivered", "Cancelled"][i % 5],
-    eta: `${15 + (i % 5) * 5} min`,
-    time: `${9 + (i % 12)}:${["00", "15", "30", "45"][i % 4]}`,
-  }));
-
-const orders = makeOrders(24);
-
+// --- Mock Data for Finance Charts (keeping as requested) ---
 const kpi = {
   ordersToday: 4260,
   gmV: 28.6, // in crores
@@ -87,26 +65,10 @@ const revenueSeries = Array.from({ length: 14 }, (_, i) => ({
   orders: 240 + Math.round(Math.random() * 140),
 }));
 
+const cities = ["Mumbai", "Bengaluru", "Delhi", "Hyderabad", "Pune", "Chennai"];
 const cityMix = cities.map((c) => ({ city: c, orders: 200 + Math.round(Math.random() * 400) }));
 
-const restaurants = Array.from({ length: 10 }, (_, i) => ({
-  id: `RST-${900 + i}`,
-  name: ["Spice Route", "Urban Dosa", "Dragon Bowl", "Bombay Bites", "Punjab Grill", "Chaat Central", "Tandoori Town", "Pasta Punto", "Sugar & Spice", "Gongfu Wok"][i],
-  city: cities[i % cities.length],
-  cuisine: cuisines[i % cuisines.length],
-  rating: (3.6 + Math.random() * 1.4).toFixed(1),
-  active: Math.random() > 0.1,
-  avgPrep: 12 + Math.round(Math.random() * 20),
-}));
-
-const riders = Array.from({ length: 8 }, (_, i) => ({
-  id: `DLV-${700 + i}`,
-  name: ["Rahul", "Suman", "Karthik", "Meera", "Imran", "Deepa", "Vikram", "Neha"][i],
-  city: cities[i % cities.length],
-  online: Math.random() > 0.3,
-  onTrip: Math.random() > 0.5,
-  rating: (3.5 + Math.random() * 1.5).toFixed(1),
-}));
+const cuisines = ["North Indian", "South Indian", "Chinese", "Italian", "Desserts", "Fast Food"];
 
 // --- Small UI helpers ---
 type StatCardProps = {
@@ -200,12 +162,10 @@ function Sidebar({ active, setActive }: SidebarProps) {
     { key: "overview", label: "Overview", icon: LayoutDashboard },
     { key: "orders", label: "Orders", icon: ShoppingBag },
     { key: "restaurants", label: "Restaurants", icon: UtensilsCrossed },
-    { key: "riders", label: "Riders", icon: Bike },
-    { key: "customers", label: "Customers", icon: Users },
+    { key: "riders", label: "Delivery Partners", icon: Bike },
+    { key: "bags", label: "Surprise Bags", icon: ShoppingBag },
+    { key: "customers", label: "Users", icon: Users },
     { key: "finance", label: "Finance", icon: IndianRupee },
-    { key: "promotions", label: "Promotions", icon: Megaphone },
-    { key: "support", label: "Support", icon: LifeBuoy },
-    { key: "settings", label: "Settings", icon: Settings },
   ];
   return (
     <div className="w-64 border-r hidden md:flex md:flex-col p-3 gap-1 bg-background/60">
@@ -221,28 +181,87 @@ function Sidebar({ active, setActive }: SidebarProps) {
           {label}
         </button>
       ))}
-      <div className="mt-auto grid grid-cols-2 gap-2 text-xs p-1">
-        <Button variant="secondary" className="gap-1"><ChevronLeft className="h-3 w-3"/>Prev</Button>
-        <Button variant="secondary" className="gap-1">Next<ChevronRight className="h-3 w-3"/></Button>
-      </div>
     </div>
   );
 }
 
 function Overview() {
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    totalRevenue: 0,
+    totalRestaurants: 0,
+    totalUsers: 0,
+    totalBags: 0,
+    loading: true,
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchStats = async () => {
+      try {
+        const [orders, restaurants, users, bags] = await Promise.all([
+          adminApi.getAllOrders(),
+          adminApi.getAllRestaurants(),
+          adminApi.getAllUsers(),
+          adminApi.getAllSurpriseBags(),
+        ]);
+
+        if (!isMounted) return;
+
+        const totalRevenue = orders.orders.reduce((sum, order: any) => sum + (Number(order.total_amount) || 0), 0);
+
+        setStats({
+          totalOrders: orders.orders.length,
+          totalRevenue,
+          totalRestaurants: restaurants.length,
+          totalUsers: users.length,
+          totalBags: bags.length,
+          loading: false,
+        });
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Error fetching overview stats:', error);
+        setStats(prev => ({ ...prev, loading: false }));
+      }
+    };
+    
+    fetchStats();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
-        <StatCard icon={ShoppingBag} title="Orders Today" value={kpi.ordersToday.toLocaleString()} delta={4.2} />
+        <StatCard 
+          icon={ShoppingBag} 
+          title="Total Orders" 
+          value={stats.loading ? "..." : stats.totalOrders.toLocaleString()} 
+        />
       </motion.div>
       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-        <StatCard icon={IndianRupee} title="GMV" value={kpi.gmV} suffix="Cr" delta={3.1} />
+        <StatCard 
+          icon={IndianRupee} 
+          title="Total Revenue" 
+          value={stats.loading ? "..." : `₹${stats.totalRevenue.toFixed(2)}`}
+        />
       </motion.div>
       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-        <StatCard icon={UtensilsCrossed} title="AOV" value={`₹${kpi.aov}`} delta={-1.3} />
+        <StatCard 
+          icon={UtensilsCrossed} 
+          title="Restaurants" 
+          value={stats.loading ? "..." : stats.totalRestaurants} 
+        />
       </motion.div>
       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-        <StatCard icon={Bike} title="On-time Delivery" value={`${kpi.onTime}%`} delta={1.1} />
+        <StatCard 
+          icon={Users} 
+          title="Total Users" 
+          value={stats.loading ? "..." : stats.totalUsers} 
+        />
       </motion.div>
 
       <Card className="lg:col-span-3 rounded-2xl">
@@ -287,68 +306,104 @@ function Overview() {
 
 function Orders() {
   const [status, setStatus] = useState("all");
-  const filtered = useMemo(() => orders.filter(o => status === "all" ? true : o.status === status), [status]);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchOrders = async () => {
+      try {
+        const data = await adminApi.getAllOrders();
+        if (!isMounted) return;
+        setOrders(data.orders);
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Error fetching orders:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchOrders();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filtered = useMemo(() => 
+    status === "all" ? orders : orders.filter(o => o.order_status === status), 
+    [orders, status]
+  );
+
   return (
     <div className="grid gap-4">
       <Card className="rounded-2xl">
-        <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="flex items-center gap-2">
-            <Input placeholder="Search by ID, cust, resto" />
+            <Input placeholder="Search by ID, customer, restaurant" />
             <Button variant="secondary" className="gap-2"><Filter className="h-4 w-4"/>Filter</Button>
           </div>
           <Select value={status} onValueChange={setStatus}>
             <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
-              {(["all", "Placed", "Preparing", "On the way", "Delivered", "Cancelled"]).map(s => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select defaultValue="Mumbai">
-            <SelectTrigger><SelectValue placeholder="City" /></SelectTrigger>
-            <SelectContent>
-              {cities.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="confirmed">Confirmed</SelectItem>
+              <SelectItem value="ready_for_pickup">Ready for Pickup</SelectItem>
+              <SelectItem value="picked_up">Picked Up</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
         </CardContent>
       </Card>
 
       <Card className="rounded-2xl">
-        <CardHeader className="pb-0"><CardTitle>Recent Orders</CardTitle></CardHeader>
+        <CardHeader className="pb-0"><CardTitle>All Orders</CardTitle></CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Order ID</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Restaurant</TableHead>
-                <TableHead>City</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead>Value</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>ETA</TableHead>
-                <TableHead>Time</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((o) => (
-                <TableRow key={o.id}>
-                  <TableCell className="font-medium">{o.id}</TableCell>
-                  <TableCell>{o.customer}</TableCell>
-                  <TableCell>{o.restaurant}</TableCell>
-                  <TableCell>{o.city}</TableCell>
-                  <TableCell>{o.items}</TableCell>
-                  <TableCell>₹{o.value}</TableCell>
-                  <TableCell>
-                    <Badge variant={o.status === "Delivered" ? "default" : o.status === "Cancelled" ? "destructive" : "secondary"}>{o.status}</Badge>
-                  </TableCell>
-                  <TableCell>{o.eta}</TableCell>
-                  <TableCell>{o.time}</TableCell>
+          {loading ? (
+            <div className="text-center py-8">Loading orders...</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No orders found</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order ID</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Restaurant</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-            <TableCaption>{filtered.length} orders listed</TableCaption>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((o) => (
+                  <TableRow key={o.id}>
+                    <TableCell className="font-medium">{o.id.substring(0, 8)}</TableCell>
+                    <TableCell>{o.customer_name || 'N/A'}</TableCell>
+                    <TableCell>{o.restaurant_name || 'N/A'}</TableCell>
+                    <TableCell>₹{Number(o.total_amount).toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        o.order_status === "delivered" ? "default" : 
+                        o.order_status === "cancelled" ? "destructive" : 
+                        "secondary"
+                      }>
+                        {o.order_status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{new Date(o.order_date).toLocaleDateString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+              <TableCaption>{filtered.length} orders listed</TableCaption>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -356,39 +411,83 @@ function Orders() {
 }
 
 function Restaurants() {
+  const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchRestaurants = async () => {
+      try {
+        const data = await adminApi.getAllRestaurants();
+        if (!isMounted) return;
+        setRestaurants(data);
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Error fetching restaurants:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchRestaurants();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <div className="grid gap-4">
       <Card className="rounded-2xl">
         <CardHeader className="pb-2"><CardTitle>Partner Restaurants</CardTitle></CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>City</TableHead>
-                <TableHead>Cuisine</TableHead>
-                <TableHead>Rating</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Avg Prep (min)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {restaurants.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-medium">{r.id}</TableCell>
-                  <TableCell>{r.name}</TableCell>
-                  <TableCell>{r.city}</TableCell>
-                  <TableCell>{r.cuisine}</TableCell>
-                  <TableCell>{r.rating}</TableCell>
-                  <TableCell>
-                    <Badge variant={r.active ? "default" : "secondary"}>{r.active ? "Active" : "Paused"}</Badge>
-                  </TableCell>
-                  <TableCell>{r.avgPrep}</TableCell>
+          {loading ? (
+            <div className="text-center py-8">Loading restaurants...</div>
+          ) : restaurants.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No restaurants found</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Contact Person</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Rating</TableHead>
+                  <TableHead>Verified</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {restaurants.map((r) => (
+                  <TableRow key={r.restaurant_id}>
+                    <TableCell className="font-medium">{r.restaurant_name || 'N/A'}</TableCell>
+                    <TableCell>{r.contact_person_name || 'N/A'}</TableCell>
+                    <TableCell>{r.user_email || 'N/A'}</TableCell>
+                    <TableCell>{r.phone_number || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        r.status === "approved" ? "default" : 
+                        r.status === "rejected" ? "destructive" : 
+                        "secondary"
+                      }>
+                        {r.status || 'pending'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{r.average_rating || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Badge variant={r.documents_verified ? "default" : "secondary"}>
+                        {r.documents_verified ? "Yes" : "No"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -396,39 +495,87 @@ function Restaurants() {
 }
 
 function Riders() {
+  const [deliveryPartners, setDeliveryPartners] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchDeliveryPartners = async () => {
+      try {
+        const data = await adminApi.getAllDeliveryPartners();
+        if (!isMounted) return;
+        setDeliveryPartners(data);
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Error fetching delivery partners:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchDeliveryPartners();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
     <div className="grid gap-4">
       <Card className="rounded-2xl">
-        <CardHeader className="pb-2"><CardTitle>Rider Fleet</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle>Delivery Partners</CardTitle></CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>City</TableHead>
-                <TableHead>Online</TableHead>
-                <TableHead>On Trip</TableHead>
-                <TableHead>Rating</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {riders.map((d) => (
-                <TableRow key={d.id}>
-                  <TableCell className="font-medium">{d.id}</TableCell>
-                  <TableCell>{d.name}</TableCell>
-                  <TableCell>{d.city}</TableCell>
-                  <TableCell>
-                    <Badge variant={d.online ? "default" : "secondary"}>{d.online ? "Online" : "Offline"}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={d.onTrip ? "default" : "secondary"}>{d.onTrip ? "Yes" : "No"}</Badge>
-                  </TableCell>
-                  <TableCell>{d.rating}</TableCell>
+          {loading ? (
+            <div className="text-center py-8">Loading delivery partners...</div>
+          ) : deliveryPartners.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No delivery partners found</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Vehicle</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Availability</TableHead>
+                  <TableHead>Verified</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {deliveryPartners.map((d) => (
+                  <TableRow key={d.user_id}>
+                    <TableCell className="font-medium">{d.full_name || 'N/A'}</TableCell>
+                    <TableCell>{d.email || 'N/A'}</TableCell>
+                    <TableCell>{d.phone_number || 'N/A'}</TableCell>
+                    <TableCell>{d.vehicle_type || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        d.status === "approved" ? "default" : 
+                        d.status === "rejected" ? "destructive" : 
+                        "secondary"
+                      }>
+                        {d.status || 'pending'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={d.is_available ? "default" : "secondary"}>
+                        {d.is_available ? "Available" : "Unavailable"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={d.documents_verified ? "default" : "secondary"}>
+                        {d.documents_verified ? "Yes" : "No"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -476,14 +623,156 @@ function Finance() {
   );
 }
 
-type PlaceholderProps = { title: string };
-function Placeholder({ title }: PlaceholderProps) {
+function Customers() {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchUsers = async () => {
+      try {
+        const data = await adminApi.getAllUsers();
+        if (!isMounted) return;
+        setUsers(data);
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Error fetching users:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchUsers();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   return (
-    <div className="grid place-items-center h-64">
-      <div className="text-center">
-        <div className="text-xl font-semibold mb-2">{title}</div>
-        <p className="text-muted-foreground">This section is a placeholder in the mockup. Add your own components and flows here.</p>
-      </div>
+    <div className="grid gap-4">
+      <Card className="rounded-2xl">
+        <CardHeader className="pb-2"><CardTitle>All Users</CardTitle></CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-8">Loading users...</div>
+          ) : users.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No users found</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>User Type</TableHead>
+                  <TableHead>Verified</TableHead>
+                  <TableHead>Active</TableHead>
+                  <TableHead>Joined</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">{u.full_name || 'N/A'}</TableCell>
+                    <TableCell>{u.email || 'N/A'}</TableCell>
+                    <TableCell>{u.phone_number || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{u.user_type}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={u.is_verified ? "default" : "secondary"}>
+                        {u.is_verified ? "Yes" : "No"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={u.is_active ? "default" : "destructive"}>
+                        {u.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{new Date(u.created_at).toLocaleDateString()}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SurpriseBags() {
+  const [bags, setBags] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchBags = async () => {
+      try {
+        const data = await adminApi.getAllSurpriseBags();
+        if (!isMounted) return;
+        setBags(data);
+      } catch (error) {
+        if (!isMounted) return;
+        console.error('Error fetching surprise bags:', error);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchBags();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  return (
+    <div className="grid gap-4">
+      <Card className="rounded-2xl">
+        <CardHeader className="pb-2"><CardTitle>Surprise Bags</CardTitle></CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-8">Loading surprise bags...</div>
+          ) : bags.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No surprise bags found</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Restaurant</TableHead>
+                  <TableHead>Original Price</TableHead>
+                  <TableHead>Discounted Price</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Pickup Time</TableHead>
+                  <TableHead>Created</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bags.map((bag) => (
+                  <TableRow key={bag.id}>
+                    <TableCell className="font-medium">{bag.id?.substring(0, 8) || 'N/A'}</TableCell>
+                    <TableCell>{bag.restaurant_id?.substring(0, 8) || 'N/A'}</TableCell>
+                    <TableCell>₹{Number(bag.original_price || 0).toFixed(2)}</TableCell>
+                    <TableCell>₹{Number(bag.discounted_price || 0).toFixed(2)}</TableCell>
+                    <TableCell>{bag.quantity_available || 0}</TableCell>
+                    <TableCell>{bag.pickup_time_start || 'N/A'} - {bag.pickup_time_end || 'N/A'}</TableCell>
+                    <TableCell>{bag.created_at ? new Date(bag.created_at).toLocaleDateString() : 'N/A'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -529,11 +818,9 @@ export default function Dashboard() {
               <TabsTrigger value="orders" />
               <TabsTrigger value="restaurants" />
               <TabsTrigger value="riders" />
+              <TabsTrigger value="bags" />
               <TabsTrigger value="customers" />
               <TabsTrigger value="finance" />
-              <TabsTrigger value="promotions" />
-              <TabsTrigger value="support" />
-              <TabsTrigger value="settings" />
             </TabsList>
           </Tabs>
 
@@ -542,16 +829,14 @@ export default function Dashboard() {
           {active === "orders" && <Orders />}
           {active === "restaurants" && <Restaurants />}
           {active === "riders" && <Riders />}
-          {active === "customers" && <Placeholder title="Customers" />}
+          {active === "bags" && <SurpriseBags />}
+          {active === "customers" && <Customers />}
           {active === "finance" && <Finance />}
-          {active === "promotions" && <Placeholder title="Promotions" />}
-          {active === "support" && <Placeholder title="Support" />}
-          {active === "settings" && <Placeholder title="Settings" />}
         </main>
       </div>
 
       <footer className="text-xs text-muted-foreground px-6 py-8">
-        Mock data for demo purposes. Replace with real analytics, order feeds, and partner data.
+        Admin Dashboard - Real-time data from Fozo Backend API
       </footer>
     </div>
   );
