@@ -234,72 +234,38 @@ function Overview() {
   }, []);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
-        <StatCard 
-          icon={ShoppingBag} 
-          title="Total Orders" 
-          value={stats.loading ? "..." : stats.totalOrders.toLocaleString()} 
-        />
-      </motion.div>
-      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-        <StatCard 
-          icon={IndianRupee} 
-          title="Total Revenue" 
-          value={stats.loading ? "..." : `₹${stats.totalRevenue.toFixed(2)}`}
-        />
-      </motion.div>
-      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-        <StatCard 
-          icon={UtensilsCrossed} 
-          title="Restaurants" 
-          value={stats.loading ? "..." : stats.totalRestaurants} 
-        />
-      </motion.div>
-      <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-        <StatCard 
-          icon={Users} 
-          title="Total Users" 
-          value={stats.loading ? "..." : stats.totalUsers} 
-        />
-      </motion.div>
-
-      <Card className="lg:col-span-3 rounded-2xl">
-        <CardHeader>
-          <CardTitle>Revenue & Orders (last 14 days)</CardTitle>
-        </CardHeader>
-        <CardContent className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={revenueSeries} margin={{ left: 10, right: 10, top: 10, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="day" />
-              <YAxis yAxisId="left" />
-              <YAxis yAxisId="right" orientation="right" />
-              <ReTooltip />
-              <Legend />
-              <Area yAxisId="left" type="monotone" dataKey="revenue" fillOpacity={0.3} />
-              <Line yAxisId="right" type="monotone" dataKey="orders" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <CardTitle>Orders by City (today)</CardTitle>
-        </CardHeader>
-        <CardContent className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={cityMix}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="city" />
-              <YAxis />
-              <ReTooltip />
-              <Bar dataKey="orders" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+    <div className="h-full w-full flex flex-col">
+      {/* Stats Cards Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6 w-full">
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
+          <StatCard 
+            icon={ShoppingBag} 
+            title="Total Orders" 
+            value={stats.loading ? "..." : stats.totalOrders.toLocaleString()} 
+          />
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <StatCard 
+            icon={IndianRupee} 
+            title="Total Revenue" 
+            value={stats.loading ? "..." : `₹${stats.totalRevenue.toFixed(2)}`}
+          />
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+          <StatCard 
+            icon={UtensilsCrossed} 
+            title="Restaurants" 
+            value={stats.loading ? "..." : stats.totalRestaurants} 
+          />
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <StatCard 
+            icon={Users} 
+            title="Total Users" 
+            value={stats.loading ? "..." : stats.totalUsers} 
+          />
+        </motion.div>
+      </div>
     </div>
   );
 }
@@ -681,7 +647,21 @@ function Customers() {
                     <TableCell>{u.email || 'N/A'}</TableCell>
                     <TableCell>{u.phone_number || 'N/A'}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{u.user_type}</Badge>
+                      <Badge variant={
+                        u.user_type === "admin" ? "default" :
+                        u.user_type === "customer" ? "secondary" :
+                        u.user_type === "restaurant" ? "outline" :
+                        u.user_type === "delivery_partner" ? "destructive" :
+                        "outline"
+                      } className={
+                        u.user_type === "admin" ? "bg-blue-100 text-blue-800 border-blue-200" :
+                        u.user_type === "customer" ? "bg-green-100 text-green-800 border-green-200" :
+                        u.user_type === "restaurant" ? "bg-orange-100 text-orange-800 border-orange-200" :
+                        u.user_type === "delivery_partner" ? "bg-purple-100 text-purple-800 border-purple-200" :
+                        ""
+                      }>
+                        {u.user_type}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge variant={u.is_verified ? "default" : "secondary"}>
@@ -781,16 +761,16 @@ export default function Dashboard() {
   const [active, setActive] = useState("overview");
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 text-foreground">
+    <div className="h-screen bg-gradient-to-b from-background to-muted/20 text-foreground flex flex-col">
       {/* Top Bar */}
       <TopBar />
 
-      <div className="max-w-[1400px] mx-auto grid grid-cols-1 md:grid-cols-[16rem_1fr] gap-0">
+      <div className="max-w-[1400px] grid grid-cols-1 md:grid-cols-[16rem_1fr] gap-0 flex-1">
         {/* Sidebar */}
         <Sidebar active={active} setActive={setActive} />
 
         {/* Main */}
-        <main className="p-4 lg:p-6">
+        <main className="p-4 lg:p-6 h-full">
           <div className="mb-4 flex items-center justify-between">
             <h1 className="text-2xl lg:text-3xl font-bold capitalize">{active}</h1>
             <div className="flex items-center gap-2">
@@ -825,19 +805,21 @@ export default function Dashboard() {
           </Tabs>
 
           {/* Views */}
-          {active === "overview" && <Overview />}
-          {active === "orders" && <Orders />}
-          {active === "restaurants" && <Restaurants />}
-          {active === "riders" && <Riders />}
-          {active === "bags" && <SurpriseBags />}
-          {active === "customers" && <Customers />}
-          {active === "finance" && <Finance />}
+          <div className="flex-1">
+            {active === "overview" && <Overview />}
+            {active === "orders" && <Orders />}
+            {active === "restaurants" && <Restaurants />}
+            {active === "riders" && <Riders />}
+            {active === "bags" && <SurpriseBags />}
+            {active === "customers" && <Customers />}
+            {active === "finance" && <Finance />}
+          </div>
         </main>
       </div>
 
-      <footer className="text-xs text-muted-foreground px-6 py-8">
+      {/* <footer className="text-xs text-muted-foreground px-6 py-8">
         Admin Dashboard - Real-time data from Fozo Backend API
-      </footer>
+      </footer> */}
     </div>
   );
 }
