@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/contexts/AuthContext"
 
 export default function Login() {
   const nav = useNavigate()
+  const { login } = useAuth()
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -32,10 +34,8 @@ export default function Login() {
       const data = await response.json()
 
       if (response.ok) {
-        // Store auth token and user info
-        localStorage.setItem("auth_token", data.token)
-        localStorage.setItem("user", JSON.stringify(data.user))
-        localStorage.setItem("auth", "1")
+        // Use context instead of localStorage
+        login(data.user, data.token)
         nav("/dashboard")
       } else {
         console.error('Login error:', data)

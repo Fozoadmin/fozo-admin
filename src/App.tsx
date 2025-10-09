@@ -1,15 +1,29 @@
 import { Navigate, Route, Routes } from "react-router-dom"
+import { useState, useEffect } from "react"
+import { AuthProvider, useAuth } from "@/contexts/AuthContext"
 import Login from "@/pages/Login"
 import Dashboard from "@/pages/Dashboard"
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const authToken = localStorage.getItem("auth_token")
-  const authFlag = localStorage.getItem("auth") === "1"
-  const isAuthenticated = authToken && authFlag
+  const { isAuthenticated } = useAuth()
+  
+  // Add a small delay to ensure localStorage is read before checking auth
+  const [isReady, setIsReady] = useState(false)
+  
+  useEffect(() => {
+    // Small delay to ensure AuthContext has initialized from localStorage
+    const timer = setTimeout(() => setIsReady(true), 100)
+    return () => clearTimeout(timer)
+  }, [])
+  
+  if (!isReady) {
+    return <div>Loading...</div> // Or a proper loading component
+  }
+  
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />
 }
 
-export default function App() {
+function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -24,5 +38,13 @@ export default function App() {
       />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   )
 }
