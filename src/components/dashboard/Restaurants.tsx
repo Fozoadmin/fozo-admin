@@ -14,7 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus } from "lucide-react";
+import { Plus, MapPin, Loader2, Search, Building2 } from "lucide-react";
+
+const GOOGLE_MAPS_API_KEY = "AIzaSyBZ7EOC3Q8cmGLAr6EkUZc8M4tCh_jord0";
 
 const DAYS_OF_WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
@@ -23,6 +25,15 @@ export function Restaurants() {
   const [loading, setLoading] = useState(true);
   const [openAdd, setOpenAdd] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
+  
+  // Search
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searching, setSearching] = useState(false);
+  
+  // Detail popup
+  const [selectedRestaurant, setSelectedRestaurant] = useState<any | null>(null);
+  const [openDetail, setOpenDetail] = useState(false);
   
   // Basic Info
   const [formR, setFormR] = useState({
@@ -66,29 +77,35 @@ export function Restaurants() {
   });
 
   useEffect(() => {
-    let isMounted = true;
-    
-    const fetchRestaurants = async () => {
-      try {
-        const data = await adminApi.getAllRestaurants();
-        if (!isMounted) return;
-        setRestaurants(data);
-      } catch (error) {
-        if (!isMounted) return;
-        console.error('Error fetching restaurants:', error);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-    
     fetchRestaurants();
-    
-    return () => {
-      isMounted = false;
-    };
   }, []);
+
+  const fetchRestaurants = async (search?: string) => {
+    try {
+      setSearching(true);
+      const data = await adminApi.getAllRestaurants(search);
+      setRestaurants(data);
+    } catch (error) {
+      console.error('Error fetching restaurants:', error);
+    } finally {
+      setLoading(false);
+      setSearching(false);
+    }
+  };
+
+  const handleSearch = () => {
+    fetchRestaurants(searchTerm);
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm("");
+    fetchRestaurants();
+  };
+
+  const openRestaurantDetail = (restaurant: any) => {
+    setSelectedRestaurant(restaurant);
+    setOpenDetail(true);
+  };
 
   const resetForm = () => {
     setFormR({
@@ -124,6 +141,57 @@ export function Restaurants() {
       accountHolderName: "",
       bankName: ""
     });
+  };
+
+  // Geocode address to get lat/long
+  const handleGeocodeAddress = async () => {
+    if (!location.address.trim()) {
+      alert("Please enter an address first");
+      return;
+    }
+
+    try {
+      setGeocoding(true);
+      const encodedAddress = encodeURIComponent(location.address);
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${GOOGLE_MAPS_API_KEY}`
+      );
+      
+      const data = await response.json();
+      
+      if (data.status === "OK" && data.results && data.results.length > 0) {
+        const result = data.results[0];
+        const lat = result.geometry.location.lat;
+        const lng = result.geometry.location.lng;
+        
+        setLocation({
+          ...location,
+          latitude: lat.toString(),
+          longitude: lng.toString()
+        });
+        
+        alert("Location coordinates found successfully!");
+      } else {
+        alert(`Geocoding failed: ${data.status}. Please check the address and try again.`);
+      }
+    } catch (error) {
+      console.error("Geocoding error:", error);
+      alert("Failed to get coordinates. Please check your internet connection and try again.");
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
+  // Check if all required fields are filled
+  const isFormValid = () => {
+    // Basic info validation
+    const basicValid = formR.fullName && formR.password && formR.restaurantName && 
+                       (formR.email || formR.phoneNumber);
+    
+    // Location validation (must have address AND coordinates)
+    const locationValid = location.address && location.latitude && location.longitude;
+    
+    return basicValid && locationValid;
   };
 
   const handleCreate = async () => {
@@ -164,7 +232,7 @@ export function Restaurants() {
       
       // Single API call to onboard restaurant with all details
       await adminApi.onboardRestaurant({
-        phoneNumber: formR.phoneNumber || undefined,
+        phoneNumber: formR.phoneNumber ? `+91${formR.phoneNumber}` : undefined,
         email: formR.email || undefined,
         password: formR.password,
         fullName: formR.fullName,
@@ -179,7 +247,7 @@ export function Restaurants() {
           address: location.address,
           latitude: parseFloat(location.latitude),
           longitude: parseFloat(location.longitude),
-          contactNumber: location.contactNumber || formR.phoneNumber,
+          contactNumber: location.contactNumber ? `+91${location.contactNumber}` : (formR.phoneNumber ? `+91${formR.phoneNumber}` : undefined),
           email: location.email || formR.email
         },
         operatingHours: hoursArray
@@ -211,12 +279,13 @@ export function Restaurants() {
   return (
     <div className="grid gap-4">
       <Card className="rounded-2xl">
-        <CardHeader className="pb-2 flex flex-row items-center justify-between">
-          <CardTitle>Partner Restaurants</CardTitle>
-          <Dialog open={openAdd} onOpenChange={(open) => { setOpenAdd(open); if (!open) resetForm(); }}>
-            <DialogTrigger asChild>
-              <Button className="gap-2"><Plus className="h-4 w-4"/>Add Restaurant</Button>
-            </DialogTrigger>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between mb-4">
+            <CardTitle>Partner Restaurants</CardTitle>
+            <Dialog open={openAdd} onOpenChange={(open) => { setOpenAdd(open); if (!open) resetForm(); }}>
+              <DialogTrigger asChild>
+                <Button className="gap-2"><Plus className="h-4 w-4"/>Add Restaurant</Button>
+              </DialogTrigger>
             <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add Restaurant</DialogTitle>
@@ -248,7 +317,21 @@ export function Restaurants() {
                     </div>
                     <div>
                       <label className="text-sm font-medium">Phone Number *</label>
-                      <Input value={formR.phoneNumber} onChange={e => setFormR({...formR, phoneNumber: e.target.value})} placeholder="+919876543210" />
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium px-3 py-2 bg-muted rounded-md">+91</span>
+                        <Input 
+                          value={formR.phoneNumber} 
+                          onChange={e => {
+                            const value = e.target.value.replace(/\D/g, '');
+                            if (value.length <= 10) {
+                              setFormR({...formR, phoneNumber: value});
+                            }
+                          }}
+                          placeholder="9876543210"
+                          maxLength={10}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">Enter 10-digit mobile number</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium">Password *</label>
@@ -284,18 +367,67 @@ export function Restaurants() {
                     <div className="col-span-2">
                       <label className="text-sm font-medium">Address *</label>
                       <Input value={location.address} onChange={e => setLocation({...location, address: e.target.value})} placeholder="123 Main Street, City, State - 400001" />
+                      <p className="text-xs text-muted-foreground mt-1">Enter the full address and click the button below to get coordinates</p>
+                    </div>
+                    <div className="col-span-2">
+                      <Button 
+                        type="button"
+                        onClick={handleGeocodeAddress} 
+                        disabled={!location.address || geocoding}
+                        className="w-full gap-2"
+                        variant="secondary"
+                      >
+                        {geocoding ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Getting Coordinates...
+                          </>
+                        ) : (
+                          <>
+                            <MapPin className="h-4 w-4" />
+                            Get Coordinates from Address
+                          </>
+                        )}
+                      </Button>
                     </div>
                     <div>
                       <label className="text-sm font-medium">Latitude *</label>
-                      <Input type="number" step="0.000001" value={location.latitude} onChange={e => setLocation({...location, latitude: e.target.value})} placeholder="19.076090" />
+                      <Input 
+                        type="text" 
+                        value={location.latitude} 
+                        readOnly 
+                        placeholder="Auto-filled from address"
+                        className="bg-muted cursor-not-allowed"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Auto-populated from address</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium">Longitude *</label>
-                      <Input type="number" step="0.000001" value={location.longitude} onChange={e => setLocation({...location, longitude: e.target.value})} placeholder="72.877426" />
+                      <Input 
+                        type="text" 
+                        value={location.longitude} 
+                        readOnly 
+                        placeholder="Auto-filled from address"
+                        className="bg-muted cursor-not-allowed"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Auto-populated from address</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium">Location Contact</label>
-                      <Input value={location.contactNumber} onChange={e => setLocation({...location, contactNumber: e.target.value})} placeholder="+919876543210" />
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium px-3 py-2 bg-muted rounded-md">+91</span>
+                        <Input 
+                          value={location.contactNumber} 
+                          onChange={e => {
+                            const value = e.target.value.replace(/\D/g, '');
+                            if (value.length <= 10) {
+                              setLocation({...location, contactNumber: value});
+                            }
+                          }}
+                          placeholder="9876543210"
+                          maxLength={10}
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="text-sm font-medium">Location Email</label>
@@ -362,12 +494,36 @@ export function Restaurants() {
               
               <div className="flex justify-end gap-2 mt-4">
                 <Button variant="outline" onClick={() => { setOpenAdd(false); resetForm(); }}>Cancel</Button>
-                <Button disabled={creating} onClick={handleCreate}>
+                <Button disabled={creating || !isFormValid()} onClick={handleCreate}>
                   {creating ? 'Creating...' : 'Create Restaurant'}
                 </Button>
               </div>
+              {!isFormValid() && (
+                <p className="text-xs text-amber-600 text-right mt-2">
+                  Please fill all required fields including address coordinates
+                </p>
+              )}
             </DialogContent>
           </Dialog>
+          </div>
+          <div className="flex gap-2">
+            <Input 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              placeholder="Search by name, email, or phone"
+              className="max-w-md"
+            />
+            <Button onClick={handleSearch} disabled={searching} className="gap-2">
+              <Search className="h-4 w-4" />
+              Search
+            </Button>
+            {searchTerm && (
+              <Button variant="outline" onClick={handleClearSearch}>
+                Clear
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -389,7 +545,11 @@ export function Restaurants() {
               </TableHeader>
               <TableBody>
                 {restaurants.map((r) => (
-                  <TableRow key={r.restaurant_id}>
+                  <TableRow 
+                    key={r.restaurant_id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => openRestaurantDetail(r)}
+                  >
                     <TableCell className="font-medium">{r.restaurant_name || 'N/A'}</TableCell>
                     <TableCell>{r.contact_person_name || 'N/A'}</TableCell>
                     <TableCell>{r.user_email || 'N/A'}</TableCell>
@@ -416,6 +576,97 @@ export function Restaurants() {
           )}
         </CardContent>
       </Card>
+
+      {/* Restaurant Detail Dialog */}
+      <Dialog open={openDetail} onOpenChange={setOpenDetail}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Restaurant Details
+            </DialogTitle>
+          </DialogHeader>
+          {selectedRestaurant && (
+            <div className="grid gap-6">
+              {/* Basic Info */}
+              <div>
+                <h3 className="font-semibold mb-3">Basic Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Restaurant Name</label>
+                    <div className="text-sm mt-1">{selectedRestaurant.restaurant_name || '—'}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Contact Person</label>
+                    <div className="text-sm mt-1">{selectedRestaurant.contact_person_name || '—'}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Email</label>
+                    <div className="text-sm mt-1">{selectedRestaurant.user_email || '—'}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Phone</label>
+                    <div className="text-sm mt-1">{selectedRestaurant.phone_number || '—'}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">FSSAI License</label>
+                    <div className="text-sm mt-1">{selectedRestaurant.fssai_license_number || '—'}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">GSTIN</label>
+                    <div className="text-sm mt-1">{selectedRestaurant.gstin_number || '—'}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Status</label>
+                    <div className="text-sm mt-1">
+                      <Badge variant={
+                        selectedRestaurant.status === "approved" ? "default" :
+                        selectedRestaurant.status === "rejected" ? "destructive" :
+                        "secondary"
+                      }>
+                        {selectedRestaurant.status || 'pending'}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Average Rating</label>
+                    <div className="text-sm mt-1">{selectedRestaurant.average_rating || '0.0'} ⭐</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Documents Verified</label>
+                    <div className="text-sm mt-1">
+                      <Badge variant={selectedRestaurant.documents_verified ? "default" : "secondary"}>
+                        {selectedRestaurant.documents_verified ? "Yes" : "No"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Created At</label>
+                    <div className="text-sm mt-1">
+                      {selectedRestaurant.created_at ? new Date(selectedRestaurant.created_at).toLocaleString() : '—'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* IDs */}
+              <div>
+                <h3 className="font-semibold mb-3">System IDs</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Restaurant ID</label>
+                    <div className="text-xs mt-1 font-mono">{selectedRestaurant.restaurant_id}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">User ID</label>
+                    <div className="text-xs mt-1 font-mono">{selectedRestaurant.user_id}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

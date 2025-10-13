@@ -85,9 +85,14 @@ export async function apiRequest<T>(
 
 // Admin API methods
 export const adminApi = {
-  getAllUsers: (userType?: 'customer' | 'restaurant' | 'delivery_partner' | 'admin') => 
-    apiRequest<any[]>(`/admin/users${userType ? `?userType=${userType}` : ''}`),
-  getAllRestaurants: () => apiRequest<any[]>('/admin/restaurants'),
+  getAllUsers: (userType?: 'customer' | 'restaurant' | 'delivery_partner' | 'admin', search?: string) => {
+    const params = new URLSearchParams();
+    if (userType) params.append('userType', userType);
+    if (search) params.append('search', search);
+    return apiRequest<any[]>(`/admin/users${params.toString() ? `?${params.toString()}` : ''}`);
+  },
+  getAllRestaurants: (search?: string) => 
+    apiRequest<any[]>(`/admin/restaurants${search ? `?search=${encodeURIComponent(search)}` : ''}`),
   // Onboard new restaurant (single transaction)
   onboardRestaurant: (body: {
     phoneNumber?: string;

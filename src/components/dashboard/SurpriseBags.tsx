@@ -3,7 +3,6 @@ import { adminApi } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   Table,
@@ -14,17 +13,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 
 export function SurpriseBags() {
   const [bags, setBags] = useState<any[]>([]);
-  const [restaurants, setRestaurants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [openAdd, setOpenAdd] = useState(false);
   const [creating, setCreating] = useState(false);
   
+  // Restaurant search
+  const [restaurantSearch, setRestaurantSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<any | null>(null);
+  
   const [formB, setFormB] = useState({
-    targetRestaurantId: "",
     bagName: "",
     denominationValue: "",
     actualWorth: "",
@@ -42,13 +45,9 @@ export function SurpriseBags() {
     
     const fetchData = async () => {
       try {
-        const [bagsData, restaurantsData] = await Promise.all([
-          adminApi.getAllSurpriseBags(),
-          adminApi.getAllRestaurants()
-        ]);
+        const bagsData = await adminApi.getAllSurpriseBags();
         if (!isMounted) return;
         setBags(bagsData);
-        setRestaurants(restaurantsData);
       } catch (error) {
         if (!isMounted) return;
         console.error('Error fetching surprise bags:', error);
@@ -66,9 +65,37 @@ export function SurpriseBags() {
     };
   }, []);
 
+  // Search restaurants
+  const handleSearchRestaurants = async () => {
+    if (!restaurantSearch.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setSearching(true);
+      const results = await adminApi.getAllRestaurants(restaurantSearch);
+      setSearchResults(results.filter(r => r.status === 'approved'));
+    } catch (error) {
+      console.error('Error searching restaurants:', error);
+      alert('Failed to search restaurants');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const selectRestaurant = (restaurant: any) => {
+    setSelectedRestaurant(restaurant);
+    setSearchResults([]);
+    setRestaurantSearch("");
+  };
+
+  const clearSelectedRestaurant = () => {
+    setSelectedRestaurant(null);
+  };
+
   const resetForm = () => {
     setFormB({
-      targetRestaurantId: "",
       bagName: "",
       denominationValue: "",
       actualWorth: "",
@@ -80,14 +107,22 @@ export function SurpriseBags() {
       availableDate: "",
       isActive: true
     });
+    setSelectedRestaurant(null);
+    setRestaurantSearch("");
+    setSearchResults([]);
+  };
+
+  const isFormValid = () => {
+    return selectedRestaurant && formB.bagName && formB.denominationValue && 
+           formB.actualWorth && formB.quantityAvailable;
   };
 
   const handleCreate = async () => {
     try {
       setCreating(true);
       
-      if (!formB.targetRestaurantId) {
-        alert("Please select a restaurant");
+      if (!selectedRestaurant) {
+        alert("Please search and select a restaurant");
         return;
       }
       
@@ -97,7 +132,7 @@ export function SurpriseBags() {
       }
 
       await adminApi.createSurpriseBag({
-        targetRestaurantId: formB.targetRestaurantId,
+        targetRestaurantId: selectedRestaurant.restaurant_id || selectedRestaurant.id,
         bagName: formB.bagName,
         denominationValue: parseFloat(formB.denominationValue),
         actualWorth: parseFloat(formB.actualWorth),
@@ -113,6 +148,7 @@ export function SurpriseBags() {
       setBags(await adminApi.getAllSurpriseBags());
       setOpenAdd(false);
       resetForm();
+      alert("Surprise bag created successfully!");
     } catch (err) {
       console.error('Create surprise bag failed', err);
       alert(`Failed to create surprise bag: ${err}`);
@@ -133,133 +169,176 @@ export function SurpriseBags() {
             <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add Surprise Bag</DialogTitle>
-                <DialogDescription>Create a surprise bag for a restaurant</DialogDescription>
+                <DialogDescription>Search for a restaurant and create a surprise bag</DialogDescription>
               </DialogHeader>
               
               <div className="grid gap-4">
-                {/* Restaurant Selection */}
-                <div>
-                  <label className="text-sm font-medium">Restaurant *</label>
-                  <Select value={formB.targetRestaurantId} onValueChange={(v) => setFormB({...formB, targetRestaurantId: v})}>
-                    <SelectTrigger><SelectValue placeholder="Select restaurant" /></SelectTrigger>
-                    <SelectContent>
-                      {restaurants.filter(r => r.status === 'approved').map(r => (
-                        <SelectItem key={r.restaurant_id} value={r.restaurant_id}>
-                          {r.restaurant_name || r.user_email || 'Unnamed'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-1">Only approved restaurants are shown</p>
+                {/* Restaurant Search */}
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Search Restaurant *</label>
+                  {selectedRestaurant ? (
+                    <div className="flex items-center justify-between p-3 border rounded-lg bg-green-50 border-green-200">
+                      <div>
+                        <div className="font-medium">{selectedRestaurant.restaurant_name}</div>
+                        <div className="text-sm text-muted-foreground">{selectedRestaurant.user_email || selectedRestaurant.phone_number}</div>
+                      </div>
+                      <Button size="sm" variant="ghost" onClick={clearSelectedRestaurant}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex gap-2">
+                        <Input 
+                          value={restaurantSearch} 
+                          onChange={(e) => setRestaurantSearch(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleSearchRestaurants()}
+                          placeholder="Search by name, email, or phone" 
+                        />
+                        <Button onClick={handleSearchRestaurants} disabled={searching} className="gap-2">
+                          <Search className="h-4 w-4" />
+                          {searching ? 'Searching...' : 'Search'}
+                        </Button>
+                      </div>
+                      {searchResults.length > 0 && (
+                        <div className="border rounded-lg max-h-48 overflow-y-auto">
+                          {searchResults.map((restaurant) => (
+                            <div
+                              key={restaurant.restaurant_id}
+                              className="p-3 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                              onClick={() => selectRestaurant(restaurant)}
+                            >
+                              <div className="font-medium">{restaurant.restaurant_name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {restaurant.user_email || restaurant.phone_number}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Only approved restaurants will appear in search results
+                      </p>
+                    </>
+                  )}
                 </div>
 
-                {/* Bag Details */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
-                    <label className="text-sm font-medium">Bag Name *</label>
-                    <Input value={formB.bagName} onChange={(e) => setFormB({...formB, bagName: e.target.value})} placeholder="e.g., Dinner Surprise Pack" />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium">Customer Pays (₹) *</label>
-                    <Input 
-                      type="number" 
-                      step="0.01"
-                      value={formB.denominationValue} 
-                      onChange={(e) => setFormB({...formB, denominationValue: e.target.value})} 
-                      placeholder="199.00" 
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Price customer will pay</p>
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium">Actual Worth (₹) *</label>
-                    <Input 
-                      type="number" 
-                      step="0.01"
-                      value={formB.actualWorth} 
-                      onChange={(e) => setFormB({...formB, actualWorth: e.target.value})} 
-                      placeholder="399.00" 
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Original value of items</p>
-                  </div>
-                  
-                  <div className="col-span-2">
-                    <label className="text-sm font-medium">Description</label>
-                    <Input value={formB.description} onChange={(e) => setFormB({...formB, description: e.target.value})} placeholder="Brief description of the bag contents" />
-                  </div>
-                  
-                  <div className="col-span-2">
-                    <label className="text-sm font-medium">Image URL</label>
-                    <Input value={formB.imageUrl} onChange={(e) => setFormB({...formB, imageUrl: e.target.value})} placeholder="https://example.com/image.jpg" />
-                  </div>
-                </div>
+                {/* Bag Details - Only show if restaurant is selected */}
+                {selectedRestaurant && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium">Bag Name *</label>
+                        <Input value={formB.bagName} onChange={(e) => setFormB({...formB, bagName: e.target.value})} placeholder="e.g., Dinner Surprise Pack" />
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium">Customer Pays (₹) *</label>
+                        <Input 
+                          type="number" 
+                          step="0.01"
+                          value={formB.denominationValue} 
+                          onChange={(e) => setFormB({...formB, denominationValue: e.target.value})} 
+                          placeholder="199.00" 
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Price customer will pay</p>
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium">Actual Worth (₹) *</label>
+                        <Input 
+                          type="number" 
+                          step="0.01"
+                          value={formB.actualWorth} 
+                          onChange={(e) => setFormB({...formB, actualWorth: e.target.value})} 
+                          placeholder="399.00" 
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Original value of items</p>
+                      </div>
+                      
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium">Description</label>
+                        <Input value={formB.description} onChange={(e) => setFormB({...formB, description: e.target.value})} placeholder="Brief description of the bag contents" />
+                      </div>
+                      
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium">Image URL</label>
+                        <Input value={formB.imageUrl} onChange={(e) => setFormB({...formB, imageUrl: e.target.value})} placeholder="https://example.com/image.jpg" />
+                      </div>
+                    </div>
 
-                {/* Availability */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Quantity Available *</label>
-                    <Input 
-                      type="number" 
-                      value={formB.quantityAvailable} 
-                      onChange={(e) => setFormB({...formB, quantityAvailable: e.target.value})} 
-                      placeholder="10" 
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Number of bags available</p>
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium">Available Date</label>
-                    <Input 
-                      type="date" 
-                      value={formB.availableDate} 
-                      onChange={(e) => setFormB({...formB, availableDate: e.target.value})} 
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Leave empty for today</p>
-                  </div>
-                </div>
+                    {/* Availability */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium">Quantity Available *</label>
+                        <Input 
+                          type="number" 
+                          value={formB.quantityAvailable} 
+                          onChange={(e) => setFormB({...formB, quantityAvailable: e.target.value})} 
+                          placeholder="10" 
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Number of bags available</p>
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium">Available Date</label>
+                        <Input 
+                          type="date" 
+                          value={formB.availableDate} 
+                          onChange={(e) => setFormB({...formB, availableDate: e.target.value})} 
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Leave empty for today</p>
+                      </div>
+                    </div>
 
-                {/* Pickup Time */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">Pickup Start Time</label>
-                    <Input 
-                      type="time" 
-                      value={formB.pickupStartTime} 
-                      onChange={(e) => setFormB({...formB, pickupStartTime: e.target.value})} 
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium">Pickup End Time</label>
-                    <Input 
-                      type="time" 
-                      value={formB.pickupEndTime} 
-                      onChange={(e) => setFormB({...formB, pickupEndTime: e.target.value})} 
-                    />
-                  </div>
-                </div>
+                    {/* Pickup Time */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium">Pickup Start Time</label>
+                        <Input 
+                          type="time" 
+                          value={formB.pickupStartTime} 
+                          onChange={(e) => setFormB({...formB, pickupStartTime: e.target.value})} 
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium">Pickup End Time</label>
+                        <Input 
+                          type="time" 
+                          value={formB.pickupEndTime} 
+                          onChange={(e) => setFormB({...formB, pickupEndTime: e.target.value})} 
+                        />
+                      </div>
+                    </div>
 
-                {/* Active Status */}
-                <div className="flex items-center space-x-2">
-                  <input 
-                    type="checkbox" 
-                    id="bagActive" 
-                    checked={formB.isActive} 
-                    onChange={(e) => setFormB({...formB, isActive: e.target.checked})} 
-                    className="h-4 w-4" 
-                  />
-                  <label htmlFor="bagActive" className="text-sm font-medium">Bag is Active</label>
-                  <p className="text-xs text-muted-foreground">(customers can see and purchase)</p>
-                </div>
+                    {/* Active Status */}
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="checkbox" 
+                        id="bagActive" 
+                        checked={formB.isActive} 
+                        onChange={(e) => setFormB({...formB, isActive: e.target.checked})} 
+                        className="h-4 w-4" 
+                      />
+                      <label htmlFor="bagActive" className="text-sm font-medium">Bag is Active</label>
+                      <p className="text-xs text-muted-foreground">(customers can see and purchase)</p>
+                    </div>
+                  </>
+                )}
               </div>
               
               <div className="flex justify-end gap-2 mt-4">
                 <Button variant="outline" onClick={() => { setOpenAdd(false); resetForm(); }}>Cancel</Button>
-                <Button disabled={creating} onClick={handleCreate}>
+                <Button disabled={creating || !isFormValid()} onClick={handleCreate}>
                   {creating ? 'Creating...' : 'Create Surprise Bag'}
                 </Button>
               </div>
+              {!isFormValid() && (
+                <p className="text-xs text-amber-600 text-right mt-2">
+                  Please select a restaurant and fill all required fields
+                </p>
+              )}
             </DialogContent>
           </Dialog>
         </CardHeader>
@@ -284,7 +363,7 @@ export function SurpriseBags() {
               </TableHeader>
               <TableBody>
                 {bags.map((bag) => (
-                  <TableRow key={bag.id}>
+                  <TableRow key={bag.id} className="cursor-pointer hover:bg-muted/50">
                     <TableCell className="font-medium">{bag.bag_name || 'N/A'}</TableCell>
                     <TableCell>{bag.restaurant_id?.substring(0, 8) || 'N/A'}</TableCell>
                     <TableCell>₹{Number(bag.denomination_value || 0).toFixed(2)}</TableCell>

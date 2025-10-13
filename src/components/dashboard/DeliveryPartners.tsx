@@ -15,13 +15,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus } from "lucide-react";
+import { Plus, Bike } from "lucide-react";
 
 export function DeliveryPartners() {
   const [deliveryPartners, setDeliveryPartners] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [openAdd, setOpenAdd] = useState(false);
   const [creating, setCreating] = useState(false);
+  
+  // Detail popup
+  const [selectedDP, setSelectedDP] = useState<any | null>(null);
+  const [openDetail, setOpenDetail] = useState(false);
   
   const [formD, setFormD] = useState({
     fullName: "",
@@ -81,6 +85,12 @@ export function DeliveryPartners() {
     });
   };
 
+  // Check if all required fields are filled
+  const isFormValid = () => {
+    // For delivery partners: only phoneNumber, fullName, and vehicleType are required
+    return formD.fullName && formD.phoneNumber && formD.vehicleType;
+  };
+
   const handleCreate = async () => {
     try {
       setCreating(true);
@@ -106,7 +116,7 @@ export function DeliveryPartners() {
       
       // Single API call to onboard delivery partner with all details
       await adminApi.onboardDeliveryPartner({
-        phoneNumber: formD.phoneNumber,
+        phoneNumber: `+91${formD.phoneNumber}`,
         email: formD.email || undefined,
         password: formD.password || undefined,
         fullName: formD.fullName,
@@ -159,8 +169,21 @@ export function DeliveryPartners() {
                     </div>
                     <div>
                       <label className="text-sm font-medium">Phone Number *</label>
-                      <Input value={formD.phoneNumber} onChange={e => setFormD({...formD, phoneNumber: e.target.value})} placeholder="+919876543210" />
-                      <p className="text-xs text-muted-foreground mt-1">Used for OTP-based login</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium px-3 py-2 bg-muted rounded-md">+91</span>
+                        <Input 
+                          value={formD.phoneNumber} 
+                          onChange={e => {
+                            const value = e.target.value.replace(/\D/g, '');
+                            if (value.length <= 10) {
+                              setFormD({...formD, phoneNumber: value});
+                            }
+                          }}
+                          placeholder="9876543210"
+                          maxLength={10}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">Used for OTP-based login (10 digits)</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium">Email (Optional)</label>
@@ -229,10 +252,15 @@ export function DeliveryPartners() {
               
               <div className="flex justify-end gap-2 mt-4">
                 <Button variant="outline" onClick={() => { setOpenAdd(false); resetForm(); }}>Cancel</Button>
-                <Button disabled={creating} onClick={handleCreate}>
+                <Button disabled={creating || !isFormValid()} onClick={handleCreate}>
                   {creating ? 'Creating...' : 'Create Delivery Partner'}
                 </Button>
               </div>
+              {!isFormValid() && (
+                <p className="text-xs text-amber-600 text-right mt-2">
+                  Please fill all required fields (Name, Phone Number, Vehicle Type)
+                </p>
+              )}
             </DialogContent>
           </Dialog>
         </CardHeader>
@@ -256,7 +284,11 @@ export function DeliveryPartners() {
               </TableHeader>
               <TableBody>
                 {deliveryPartners.map((d) => (
-                  <TableRow key={d.user_id}>
+                  <TableRow 
+                    key={d.user_id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => { setSelectedDP(d); setOpenDetail(true); }}
+                  >
                     <TableCell className="font-medium">{d.full_name || 'N/A'}</TableCell>
                     <TableCell>{d.email || 'N/A'}</TableCell>
                     <TableCell>{d.phone_number || 'N/A'}</TableCell>
@@ -287,6 +319,90 @@ export function DeliveryPartners() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delivery Partner Detail Dialog */}
+      <Dialog open={openDetail} onOpenChange={setOpenDetail}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bike className="h-5 w-5" />
+              Delivery Partner Details
+            </DialogTitle>
+          </DialogHeader>
+          {selectedDP && (
+            <div className="grid gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Full Name</label>
+                  <div className="text-sm mt-1">{selectedDP.full_name || '—'}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Email</label>
+                  <div className="text-sm mt-1">{selectedDP.email || '—'}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Phone Number</label>
+                  <div className="text-sm mt-1">{selectedDP.phone_number || '—'}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Vehicle Type</label>
+                  <div className="text-sm mt-1 capitalize">{selectedDP.vehicle_type || '—'}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">License Number</label>
+                  <div className="text-sm mt-1">{selectedDP.license_number || '—'}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Status</label>
+                  <div className="text-sm mt-1">
+                    <Badge variant={
+                      selectedDP.status === "approved" ? "default" :
+                      selectedDP.status === "rejected" ? "destructive" :
+                      "secondary"
+                    }>
+                      {selectedDP.status || 'pending'}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Online Status</label>
+                  <div className="text-sm mt-1">
+                    <Badge variant={selectedDP.is_online ? "default" : "secondary"}>
+                      {selectedDP.is_online ? "Online" : "Offline"}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Documents Verified</label>
+                  <div className="text-sm mt-1">
+                    <Badge variant={selectedDP.documents_verified ? "default" : "secondary"}>
+                      {selectedDP.documents_verified ? "Yes" : "No"}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Total Deliveries</label>
+                  <div className="text-sm mt-1">{selectedDP.total_deliveries || 0}</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Average Rating</label>
+                  <div className="text-sm mt-1">{selectedDP.average_rating || '0.0'} ⭐</div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Created At</label>
+                  <div className="text-sm mt-1">
+                    {selectedDP.created_at ? new Date(selectedDP.created_at).toLocaleString() : '—'}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">User ID</label>
+                  <div className="text-xs mt-1 font-mono">{selectedDP.user_id}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
