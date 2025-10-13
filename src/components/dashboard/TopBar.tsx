@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { LayoutDashboard, Search, LogOut } from "lucide-react";
+import { LayoutDashboard, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function TopBar() {
