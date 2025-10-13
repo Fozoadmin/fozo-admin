@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Plus, MapPin, Loader2, Search, Building2 } from "lucide-react";
 
-const GOOGLE_MAPS_API_KEY = "AIzaSyBZ7EOC3Q8cmGLAr6EkUZc8M4tCh_jord0";
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 const DAYS_OF_WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 

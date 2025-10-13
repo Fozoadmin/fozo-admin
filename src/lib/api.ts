@@ -1,5 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/fozo/api';
-const API_KEY = 'srxdtcfy14Eguy5212hijbswd7iobhvinoqhd78gq2r74oh809h9TFR76GDH83csyHQ9DH3H8EH9Q';
+const API_KEY = import.meta.env.VITE_API_KEY || '';
 
 interface RequestOptions extends RequestInit {
   requireAuth?: boolean;
