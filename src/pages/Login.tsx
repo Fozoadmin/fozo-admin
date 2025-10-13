@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/AuthContext"
+import { apiRequest } from "@/lib/api"
 
 export default function Login() {
   const nav = useNavigate()
@@ -19,30 +20,24 @@ export default function Login() {
     setLoading(true)
 
     try {
-      const response = await fetch(`http://localhost:3000/fozo/api/auth/login-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': 'srxdtcfy14Eguy5212hijbswd7iobhvinoqhd78gq2r74oh809h9TFR76GDH83csyHQ9DH3H8EH9Q'
-        },
-        body: JSON.stringify({
-          identifier: username,
-          password: password
-        })
-      })
+      const data = await apiRequest<{ user: any; token: string }>(
+        '/auth/login-password',
+        {
+          method: 'POST',
+          requireAuth: false,
+          body: JSON.stringify({
+            identifier: username,
+            password: password
+          })
+        }
+      )
 
-      const data = await response.json()
-
-      if (response.ok) {
-        // Use context instead of localStorage
-        login(data.user, data.token)
-        nav("/dashboard")
-      } else {
-        console.error('Login error:', data)
-        setError(data.message || "Invalid username or password")
-      }
-    } catch (err) {
-      setError("Network error. Please try again.")
+      // Use context to store auth data
+      login(data.user, data.token)
+      nav("/dashboard")
+    } catch (err: any) {
+      console.error('Login error:', err)
+      setError(err.message || "Invalid username or password. Please try again.")
     } finally {
       setLoading(false)
     }
