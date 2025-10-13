@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
 
 interface User {
   id: string;
@@ -24,7 +25,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
 
   // Initialize from localStorage on mount
   useEffect(() => {
@@ -42,7 +42,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('auth_token');
       }
     }
-    setIsInitialized(true);
   }, []);
 
   const login = (userData: User, authToken: string) => {
