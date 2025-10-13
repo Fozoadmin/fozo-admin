@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Plus } from "lucide-react";
 
 export function SurpriseBags() {
@@ -21,6 +22,7 @@ export function SurpriseBags() {
   const [loading, setLoading] = useState(true);
   const [openAdd, setOpenAdd] = useState(false);
   const [creating, setCreating] = useState(false);
+  
   const [formB, setFormB] = useState({
     targetRestaurantId: "",
     bagName: "",
@@ -31,7 +33,8 @@ export function SurpriseBags() {
     quantityAvailable: "",
     pickupStartTime: "",
     pickupEndTime: "",
-    availableDate: ""
+    availableDate: "",
+    isActive: true
   });
 
   useEffect(() => {
@@ -63,25 +66,56 @@ export function SurpriseBags() {
     };
   }, []);
 
+  const resetForm = () => {
+    setFormB({
+      targetRestaurantId: "",
+      bagName: "",
+      denominationValue: "",
+      actualWorth: "",
+      description: "",
+      imageUrl: "",
+      quantityAvailable: "",
+      pickupStartTime: "",
+      pickupEndTime: "",
+      availableDate: "",
+      isActive: true
+    });
+  };
+
   const handleCreate = async () => {
     try {
       setCreating(true);
+      
+      if (!formB.targetRestaurantId) {
+        alert("Please select a restaurant");
+        return;
+      }
+      
+      if (!formB.bagName || !formB.denominationValue || !formB.actualWorth || !formB.quantityAvailable) {
+        alert("Please fill in all required fields");
+        return;
+      }
+
       await adminApi.createSurpriseBag({
         targetRestaurantId: formB.targetRestaurantId,
         bagName: formB.bagName,
-        denominationValue: Number(formB.denominationValue),
-        actualWorth: Number(formB.actualWorth),
+        denominationValue: parseFloat(formB.denominationValue),
+        actualWorth: parseFloat(formB.actualWorth),
         description: formB.description || undefined,
         imageUrl: formB.imageUrl || undefined,
-        quantityAvailable: Number(formB.quantityAvailable),
-        pickupStartTime: formB.pickupStartTime + ':00',
-        pickupEndTime: formB.pickupEndTime + ':00',
+        quantityAvailable: parseInt(formB.quantityAvailable),
+        pickupStartTime: formB.pickupStartTime ? formB.pickupStartTime + ':00' : undefined,
+        pickupEndTime: formB.pickupEndTime ? formB.pickupEndTime + ':00' : undefined,
         availableDate: formB.availableDate || undefined,
+        isActive: formB.isActive
       });
+      
       setBags(await adminApi.getAllSurpriseBags());
       setOpenAdd(false);
+      resetForm();
     } catch (err) {
       console.error('Create surprise bag failed', err);
+      alert(`Failed to create surprise bag: ${err}`);
     } finally {
       setCreating(false);
     }
@@ -92,76 +126,139 @@ export function SurpriseBags() {
       <Card className="rounded-2xl">
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <CardTitle>Surprise Bags</CardTitle>
-          <Dialog open={openAdd} onOpenChange={setOpenAdd}>
+          <Dialog open={openAdd} onOpenChange={(open) => { setOpenAdd(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button className="gap-2"><Plus className="h-4 w-4"/>Add Surprise Bag</Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add Surprise Bag</DialogTitle>
-                <DialogDescription>Create a bag for a specific restaurant.</DialogDescription>
+                <DialogDescription>Create a surprise bag for a restaurant</DialogDescription>
               </DialogHeader>
-              <div className="grid gap-3">
-                <div className="grid gap-1">
-                  <label className="text-sm">Restaurant</label>
-                  <Select value={formB.targetRestaurantId} onValueChange={(v) => setFormB({ ...formB, targetRestaurantId: v })}>
+              
+              <div className="grid gap-4">
+                {/* Restaurant Selection */}
+                <div>
+                  <label className="text-sm font-medium">Restaurant *</label>
+                  <Select value={formB.targetRestaurantId} onValueChange={(v) => setFormB({...formB, targetRestaurantId: v})}>
                     <SelectTrigger><SelectValue placeholder="Select restaurant" /></SelectTrigger>
                     <SelectContent>
-                      {restaurants.map(r => (
+                      {restaurants.filter(r => r.status === 'approved').map(r => (
                         <SelectItem key={r.restaurant_id} value={r.restaurant_id}>
                           {r.restaurant_name || r.user_email || 'Unnamed'}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground mt-1">Only approved restaurants are shown</p>
                 </div>
-                <div className="grid gap-1">
-                  <label className="text-sm">Bag Name</label>
-                  <Input value={formB.bagName} onChange={(e) => setFormB({ ...formB, bagName: e.target.value })} placeholder="Eg. Dinner Saver" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1">
-                    <label className="text-sm">Denomination Value</label>
-                    <Input type="number" value={formB.denominationValue} onChange={(e) => setFormB({ ...formB, denominationValue: e.target.value })} placeholder="199" />
+
+                {/* Bag Details */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium">Bag Name *</label>
+                    <Input value={formB.bagName} onChange={(e) => setFormB({...formB, bagName: e.target.value})} placeholder="e.g., Dinner Surprise Pack" />
                   </div>
-                  <div className="grid gap-1">
-                    <label className="text-sm">Actual Worth</label>
-                    <Input type="number" value={formB.actualWorth} onChange={(e) => setFormB({ ...formB, actualWorth: e.target.value })} placeholder="399" />
+                  
+                  <div>
+                    <label className="text-sm font-medium">Customer Pays (₹) *</label>
+                    <Input 
+                      type="number" 
+                      step="0.01"
+                      value={formB.denominationValue} 
+                      onChange={(e) => setFormB({...formB, denominationValue: e.target.value})} 
+                      placeholder="199.00" 
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Price customer will pay</p>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Actual Worth (₹) *</label>
+                    <Input 
+                      type="number" 
+                      step="0.01"
+                      value={formB.actualWorth} 
+                      onChange={(e) => setFormB({...formB, actualWorth: e.target.value})} 
+                      placeholder="399.00" 
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Original value of items</p>
+                  </div>
+                  
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium">Description</label>
+                    <Input value={formB.description} onChange={(e) => setFormB({...formB, description: e.target.value})} placeholder="Brief description of the bag contents" />
+                  </div>
+                  
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium">Image URL</label>
+                    <Input value={formB.imageUrl} onChange={(e) => setFormB({...formB, imageUrl: e.target.value})} placeholder="https://example.com/image.jpg" />
                   </div>
                 </div>
-                <div className="grid gap-1">
-                  <label className="text-sm">Description</label>
-                  <Input value={formB.description} onChange={(e) => setFormB({ ...formB, description: e.target.value })} placeholder="Short description" />
-                </div>
-                <div className="grid gap-1">
-                  <label className="text-sm">Image URL</label>
-                  <Input value={formB.imageUrl} onChange={(e) => setFormB({ ...formB, imageUrl: e.target.value })} placeholder="https://..." />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1">
-                    <label className="text-sm">Quantity Available</label>
-                    <Input type="number" value={formB.quantityAvailable} onChange={(e) => setFormB({ ...formB, quantityAvailable: e.target.value })} placeholder="10" />
+
+                {/* Availability */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Quantity Available *</label>
+                    <Input 
+                      type="number" 
+                      value={formB.quantityAvailable} 
+                      onChange={(e) => setFormB({...formB, quantityAvailable: e.target.value})} 
+                      placeholder="10" 
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Number of bags available</p>
                   </div>
-                  <div className="grid gap-1">
-                    <label className="text-sm">Available Date</label>
-                    <Input type="date" value={formB.availableDate} onChange={(e) => setFormB({ ...formB, availableDate: e.target.value })} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1">
-                    <label className="text-sm">Pickup Start Time</label>
-                    <Input type="time" value={formB.pickupStartTime} onChange={(e) => setFormB({ ...formB, pickupStartTime: e.target.value })} />
-                  </div>
-                  <div className="grid gap-1">
-                    <label className="text-sm">Pickup End Time</label>
-                    <Input type="time" value={formB.pickupEndTime} onChange={(e) => setFormB({ ...formB, pickupEndTime: e.target.value })} />
+                  
+                  <div>
+                    <label className="text-sm font-medium">Available Date</label>
+                    <Input 
+                      type="date" 
+                      value={formB.availableDate} 
+                      onChange={(e) => setFormB({...formB, availableDate: e.target.value})} 
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Leave empty for today</p>
                   </div>
                 </div>
-                <div className="flex justify-end">
-                  <Button disabled={creating} onClick={handleCreate}>
-                    {creating ? 'Creating...' : 'Create'}
-                  </Button>
+
+                {/* Pickup Time */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Pickup Start Time</label>
+                    <Input 
+                      type="time" 
+                      value={formB.pickupStartTime} 
+                      onChange={(e) => setFormB({...formB, pickupStartTime: e.target.value})} 
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Pickup End Time</label>
+                    <Input 
+                      type="time" 
+                      value={formB.pickupEndTime} 
+                      onChange={(e) => setFormB({...formB, pickupEndTime: e.target.value})} 
+                    />
+                  </div>
                 </div>
+
+                {/* Active Status */}
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    id="bagActive" 
+                    checked={formB.isActive} 
+                    onChange={(e) => setFormB({...formB, isActive: e.target.checked})} 
+                    className="h-4 w-4" 
+                  />
+                  <label htmlFor="bagActive" className="text-sm font-medium">Bag is Active</label>
+                  <p className="text-xs text-muted-foreground">(customers can see and purchase)</p>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => { setOpenAdd(false); resetForm(); }}>Cancel</Button>
+                <Button disabled={creating} onClick={handleCreate}>
+                  {creating ? 'Creating...' : 'Create Surprise Bag'}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -175,25 +272,35 @@ export function SurpriseBags() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>ID</TableHead>
+                  <TableHead>Bag Name</TableHead>
                   <TableHead>Restaurant</TableHead>
-                  <TableHead>Original Price</TableHead>
-                  <TableHead>Discounted Price</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead>Worth</TableHead>
                   <TableHead>Quantity</TableHead>
                   <TableHead>Pickup Time</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {bags.map((bag) => (
                   <TableRow key={bag.id}>
-                    <TableCell className="font-medium">{bag.id?.substring(0, 8) || 'N/A'}</TableCell>
+                    <TableCell className="font-medium">{bag.bag_name || 'N/A'}</TableCell>
                     <TableCell>{bag.restaurant_id?.substring(0, 8) || 'N/A'}</TableCell>
-                    <TableCell>₹{Number(bag.original_price || 0).toFixed(2)}</TableCell>
-                    <TableCell>₹{Number(bag.discounted_price || 0).toFixed(2)}</TableCell>
+                    <TableCell>₹{Number(bag.denomination_value || 0).toFixed(2)}</TableCell>
+                    <TableCell>₹{Number(bag.actual_worth || 0).toFixed(2)}</TableCell>
                     <TableCell>{bag.quantity_available || 0}</TableCell>
-                    <TableCell>{bag.pickup_time_start || 'N/A'} - {bag.pickup_time_end || 'N/A'}</TableCell>
-                    <TableCell>{bag.created_at ? new Date(bag.created_at).toLocaleDateString() : 'N/A'}</TableCell>
+                    <TableCell className="text-sm">
+                      {bag.pickup_start_time && bag.pickup_end_time 
+                        ? `${bag.pickup_start_time?.substring(0, 5)} - ${bag.pickup_end_time?.substring(0, 5)}`
+                        : 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={bag.is_active ? "default" : "secondary"}>
+                        {bag.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{bag.available_date ? new Date(bag.available_date).toLocaleDateString() : 'N/A'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -204,4 +311,3 @@ export function SurpriseBags() {
     </div>
   );
 }
-

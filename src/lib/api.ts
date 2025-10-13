@@ -88,9 +88,64 @@ export const adminApi = {
   getAllUsers: (userType?: 'customer' | 'restaurant' | 'delivery_partner' | 'admin') => 
     apiRequest<any[]>(`/admin/users${userType ? `?userType=${userType}` : ''}`),
   getAllRestaurants: () => apiRequest<any[]>('/admin/restaurants'),
+  // Onboard new restaurant (single transaction)
+  onboardRestaurant: (body: {
+    phoneNumber?: string;
+    email?: string;
+    password: string;
+    fullName: string;
+    userType: 'restaurant';
+    restaurantName: string;
+    contactPersonName?: string;
+    fssaiLicenseNumber?: string;
+    gstinNumber?: string;
+    bankAccountDetails?: {
+      accountNumber: string;
+      ifscCode: string;
+      accountHolderName: string;
+      bankName: string;
+    };
+    primaryLocation: {
+      locationName?: string;
+      address: string;
+      latitude: number;
+      longitude: number;
+      contactNumber?: string;
+      email?: string;
+    };
+    operatingHours: Array<{
+      dayOfWeek: string;
+      openTime: string | null;
+      closeTime: string | null;
+      isClosed: boolean;
+    }>;
+  }) => apiRequest<{ message: string; restaurant_id: string; status: string }>(
+    '/admin/restaurants',
+    { method: 'POST', body: JSON.stringify(body) }
+  ),
   getAllOrders: (status?: string) => 
     apiRequest<{ orders: any[] }>(`/admin/orders${status ? `?status=${status}` : ''}`),
   getAllDeliveryPartners: () => apiRequest<any[]>('/admin/delivery-partners'),
+  // Onboard new delivery partner (single transaction)
+  // Note: Delivery partners use OTP-based auth, so email and password are optional
+  onboardDeliveryPartner: (body: {
+    phoneNumber: string; // Required - used for OTP authentication
+    email?: string; // Optional
+    password?: string; // Optional - DPs typically use OTP
+    fullName: string;
+    userType: 'delivery_partner';
+    vehicleType: 'bicycle' | 'scooter' | 'motorcycle' | 'car';
+    licenseNumber?: string;
+    bankAccountDetails?: {
+      accountNumber: string;
+      ifscCode: string;
+      accountHolderName: string;
+      bankName: string;
+    };
+  }) => apiRequest<{ message: string; user_id: string; status: string }>(
+    '/admin/delivery-partners',
+    { method: 'POST', body: JSON.stringify(body) }
+  ),
   getAllSurpriseBags: () => apiRequest<any[]>('/admin/bags'),
   createSurpriseBag: (body: {
     targetRestaurantId: string; // admin creating for a specific restaurant
@@ -100,9 +155,10 @@ export const adminApi = {
     description?: string;
     imageUrl?: string;
     quantityAvailable: number;
-    pickupStartTime: string; // HH:MM:SS
-    pickupEndTime: string;   // HH:MM:SS
+    pickupStartTime?: string; // HH:MM:SS
+    pickupEndTime?: string;   // HH:MM:SS
     availableDate?: string;  // YYYY-MM-DD
+    isActive?: boolean;
   }) => apiRequest<{ message: string; bag: any }>(
     '/bags',
     { method: 'POST', body: JSON.stringify(body) }

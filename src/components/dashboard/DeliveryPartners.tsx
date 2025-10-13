@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -21,14 +22,21 @@ export function DeliveryPartners() {
   const [loading, setLoading] = useState(true);
   const [openAdd, setOpenAdd] = useState(false);
   const [creating, setCreating] = useState(false);
+  
   const [formD, setFormD] = useState({
     fullName: "",
     email: "",
     phoneNumber: "",
     password: "",
-    vehicle_type: "bicycle",
-    documents_verified: false,
-    status: "pending" as 'pending' | 'approved' | 'rejected' | 'suspended'
+    vehicleType: "bicycle" as 'bicycle' | 'scooter' | 'motorcycle' | 'car',
+    licenseNumber: ""
+  });
+
+  const [bankDetails, setBankDetails] = useState({
+    accountNumber: "",
+    ifscCode: "",
+    accountHolderName: "",
+    bankName: ""
   });
 
   useEffect(() => {
@@ -56,25 +64,66 @@ export function DeliveryPartners() {
     };
   }, []);
 
+  const resetForm = () => {
+    setFormD({
+      fullName: "",
+      email: "",
+      phoneNumber: "",
+      password: "",
+      vehicleType: "bicycle",
+      licenseNumber: ""
+    });
+    setBankDetails({
+      accountNumber: "",
+      ifscCode: "",
+      accountHolderName: "",
+      bankName: ""
+    });
+  };
+
   const handleCreate = async () => {
     try {
       setCreating(true);
-      await adminApi.registerPasswordUser({
-        fullName: formD.fullName,
-        email: formD.email || undefined,
-        phoneNumber: formD.phoneNumber || undefined,
-        password: formD.password,
-        userType: 'delivery_partner'
-      });
-      const all = await adminApi.getAllDeliveryPartners();
-      const created = all.find((d) => d.email === formD.email || d.phone_number === formD.phoneNumber);
-      if (created) {
-        await adminApi.updateDeliveryPartnerStatus(created.user_id, formD.status, formD.documents_verified);
+      
+      // Validate required fields - only phoneNumber, fullName, and vehicleType are required
+      if (!formD.fullName || !formD.vehicleType) {
+        alert("Please fill in all required fields (Name and Vehicle Type)");
+        return;
       }
+      
+      if (!formD.phoneNumber) {
+        alert("Phone number is required for delivery partners (used for OTP login)");
+        return;
+      }
+      
+      // Build bank details object if any field is provided
+      const bankAccountDetails = (bankDetails.accountNumber || bankDetails.ifscCode) ? {
+        accountNumber: bankDetails.accountNumber,
+        ifscCode: bankDetails.ifscCode,
+        accountHolderName: bankDetails.accountHolderName,
+        bankName: bankDetails.bankName
+      } : undefined;
+      
+      // Single API call to onboard delivery partner with all details
+      await adminApi.onboardDeliveryPartner({
+        phoneNumber: formD.phoneNumber,
+        email: formD.email || undefined,
+        password: formD.password || undefined,
+        fullName: formD.fullName,
+        userType: 'delivery_partner',
+        vehicleType: formD.vehicleType,
+        licenseNumber: formD.licenseNumber || undefined,
+        bankAccountDetails
+      });
+      
+      // Refresh the list
       setDeliveryPartners(await adminApi.getAllDeliveryPartners());
       setOpenAdd(false);
+      resetForm();
+      alert("Delivery Partner onboarded successfully!");
     } catch (err) {
       console.error('Create delivery partner failed', err);
+      alert(`Failed to create delivery partner: ${err}`);
     } finally {
       setCreating(false);
     }
@@ -85,70 +134,104 @@ export function DeliveryPartners() {
       <Card className="rounded-2xl">
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <CardTitle>Delivery Partners</CardTitle>
-          <Dialog open={openAdd} onOpenChange={setOpenAdd}>
+          <Dialog open={openAdd} onOpenChange={(open) => { setOpenAdd(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button className="gap-2"><Plus className="h-4 w-4"/>Add Delivery Partner</Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add Delivery Partner</DialogTitle>
-                <DialogDescription>Register a delivery partner and set status/verification.</DialogDescription>
+                <DialogDescription>Complete delivery partner onboarding with all details</DialogDescription>
               </DialogHeader>
-              <div className="grid gap-3">
-                <div className="grid gap-1">
-                  <label className="text-sm">Full Name</label>
-                  <Input value={formD.fullName} onChange={e => setFormD({ ...formD, fullName: e.target.value })} placeholder="Full name" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="grid gap-1">
-                    <label className="text-sm">Email</label>
-                    <Input value={formD.email} onChange={e => setFormD({ ...formD, email: e.target.value })} placeholder="email@example.com" />
+              
+              <Tabs defaultValue="basic" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="basic">Basic Info & Vehicle</TabsTrigger>
+                  <TabsTrigger value="bank">Bank Details</TabsTrigger>
+                </TabsList>
+                
+                {/* Basic Info Tab */}
+                <TabsContent value="basic" className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Full Name *</label>
+                      <Input value={formD.fullName} onChange={e => setFormD({...formD, fullName: e.target.value})} placeholder="John Doe" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Phone Number *</label>
+                      <Input value={formD.phoneNumber} onChange={e => setFormD({...formD, phoneNumber: e.target.value})} placeholder="+919876543210" />
+                      <p className="text-xs text-muted-foreground mt-1">Used for OTP-based login</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Email (Optional)</label>
+                      <Input type="email" value={formD.email} onChange={e => setFormD({...formD, email: e.target.value})} placeholder="john@example.com" />
+                      <p className="text-xs text-muted-foreground mt-1">Optional - DPs use OTP login</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Password (Optional)</label>
+                      <Input type="password" value={formD.password} onChange={e => setFormD({...formD, password: e.target.value})} placeholder="Optional password" />
+                      <p className="text-xs text-muted-foreground mt-1">Optional - DPs typically use OTP</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Vehicle Type *</label>
+                      <Select value={formD.vehicleType} onValueChange={(v) => setFormD({...formD, vehicleType: v as any})}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="bicycle">Bicycle</SelectItem>
+                          <SelectItem value="scooter">Scooter</SelectItem>
+                          <SelectItem value="motorcycle">Motorcycle</SelectItem>
+                          <SelectItem value="car">Car</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">License Number</label>
+                      <Input value={formD.licenseNumber} onChange={e => setFormD({...formD, licenseNumber: e.target.value})} placeholder="DL1234567890" />
+                    </div>
                   </div>
-                  <div className="grid gap-1">
-                    <label className="text-sm">Phone</label>
-                    <Input value={formD.phoneNumber} onChange={e => setFormD({ ...formD, phoneNumber: e.target.value })} placeholder="+91..." />
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Authentication:</strong> Delivery partners use OTP-based login via phone number. Email and password are optional and can be left blank.
+                    </p>
                   </div>
-                </div>
-                <div className="grid gap-1">
-                  <label className="text-sm">Temporary Password</label>
-                  <Input type="password" value={formD.password} onChange={e => setFormD({ ...formD, password: e.target.value })} placeholder="Set initial password" />
-                </div>
-                <div className="grid gap-1">
-                  <label className="text-sm">Vehicle Type</label>
-                  <Select value={formD.vehicle_type} onValueChange={(v) => setFormD({ ...formD, vehicle_type: v })}>
-                    <SelectTrigger><SelectValue placeholder="Vehicle" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="bicycle">Bicycle</SelectItem>
-                      <SelectItem value="scooter">Scooter</SelectItem>
-                      <SelectItem value="motorcycle">Motorcycle</SelectItem>
-                      <SelectItem value="car">Car</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center justify-between rounded-xl border p-3">
-                  <div className="text-sm">
-                    <div className="font-medium">Documents Verified</div>
-                    <div className="text-muted-foreground">Mark KYC/documents as verified</div>
+                  <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-800">
+                      <strong>Auto-Approval:</strong> Delivery partners onboarded by admins are automatically approved and verified.
+                    </p>
                   </div>
-                  <input type="checkbox" className="h-5 w-5" checked={formD.documents_verified} onChange={(e) => setFormD({ ...formD, documents_verified: e.target.checked })} />
-                </div>
-                <div className="grid gap-1">
-                  <label className="text-sm">Status</label>
-                  <Select value={formD.status} onValueChange={(v) => setFormD({ ...formD, status: v as any })}>
-                    <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="approved">Approved</SelectItem>
-                      <SelectItem value="rejected">Rejected</SelectItem>
-                      <SelectItem value="suspended">Suspended</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex justify-end">
-                  <Button disabled={creating} onClick={handleCreate}>
-                    {creating ? 'Creating...' : 'Create'}
-                  </Button>
-                </div>
+                </TabsContent>
+                
+                {/* Bank Details Tab */}
+                <TabsContent value="bank" className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Account Holder Name</label>
+                      <Input value={bankDetails.accountHolderName} onChange={e => setBankDetails({...bankDetails, accountHolderName: e.target.value})} placeholder="John Doe" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Bank Name</label>
+                      <Input value={bankDetails.bankName} onChange={e => setBankDetails({...bankDetails, bankName: e.target.value})} placeholder="HDFC Bank" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Account Number</label>
+                      <Input value={bankDetails.accountNumber} onChange={e => setBankDetails({...bankDetails, accountNumber: e.target.value})} placeholder="1234567890" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">IFSC Code</label>
+                      <Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} placeholder="HDFC0001234" />
+                    </div>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Bank details will be used for payment settlements
+                  </div>
+                </TabsContent>
+              </Tabs>
+              
+              <div className="flex justify-end gap-2 mt-4">
+                <Button variant="outline" onClick={() => { setOpenAdd(false); resetForm(); }}>Cancel</Button>
+                <Button disabled={creating} onClick={handleCreate}>
+                  {creating ? 'Creating...' : 'Create Delivery Partner'}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -167,7 +250,7 @@ export function DeliveryPartners() {
                   <TableHead>Phone</TableHead>
                   <TableHead>Vehicle</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Availability</TableHead>
+                  <TableHead>Online</TableHead>
                   <TableHead>Verified</TableHead>
                 </TableRow>
               </TableHeader>
@@ -177,7 +260,7 @@ export function DeliveryPartners() {
                     <TableCell className="font-medium">{d.full_name || 'N/A'}</TableCell>
                     <TableCell>{d.email || 'N/A'}</TableCell>
                     <TableCell>{d.phone_number || 'N/A'}</TableCell>
-                    <TableCell>{d.vehicle_type || 'N/A'}</TableCell>
+                    <TableCell className="capitalize">{d.vehicle_type || 'N/A'}</TableCell>
                     <TableCell>
                       <Badge variant={
                         d.status === "approved" ? "default" :
@@ -188,8 +271,8 @@ export function DeliveryPartners() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={d.is_available ? "default" : "secondary"}>
-                        {d.is_available ? "Available" : "Unavailable"}
+                      <Badge variant={d.is_online ? "default" : "secondary"}>
+                        {d.is_online ? "Online" : "Offline"}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -207,4 +290,3 @@ export function DeliveryPartners() {
     </div>
   );
 }
-
