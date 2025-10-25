@@ -35,6 +35,10 @@ export function Restaurants() {
   const [selectedRestaurant, setSelectedRestaurant] = useState<any | null>(null);
   const [openDetail, setOpenDetail] = useState(false);
   
+  // Cuisines
+  const [cuisines, setCuisines] = useState<Array<{ id: number; name: string }>>([]);
+  const [selectedCuisineIds, setSelectedCuisineIds] = useState<number[]>([]);
+  
   // Basic Info
   const [formR, setFormR] = useState({
     fullName: "",
@@ -78,7 +82,17 @@ export function Restaurants() {
 
   useEffect(() => {
     fetchRestaurants();
+    fetchCuisines();
   }, []);
+
+  const fetchCuisines = async () => {
+    try {
+      const data = await adminApi.getAllCuisines();
+      setCuisines(data);
+    } catch (error) {
+      console.error('Error fetching cuisines:', error);
+    }
+  };
 
   const fetchRestaurants = async (search?: string) => {
     try {
@@ -141,6 +155,7 @@ export function Restaurants() {
       accountHolderName: "",
       bankName: ""
     });
+    setSelectedCuisineIds([]);
   };
 
   // Geocode address to get lat/long
@@ -191,7 +206,10 @@ export function Restaurants() {
     // Location validation (must have address AND coordinates)
     const locationValid = location.address && location.latitude && location.longitude;
     
-    return basicValid && locationValid;
+    // Cuisine validation (at least one cuisine must be selected)
+    const cuisineValid = selectedCuisineIds.length > 0;
+    
+    return basicValid && locationValid && cuisineValid;
   };
 
   const handleCreate = async () => {
@@ -211,6 +229,11 @@ export function Restaurants() {
       
       if (!location.address || !location.latitude || !location.longitude) {
         alert("Please provide complete location details (Address, Latitude, Longitude)");
+        return;
+      }
+      
+      if (selectedCuisineIds.length === 0) {
+        alert("Please select at least one cuisine");
         return;
       }
       
@@ -250,7 +273,8 @@ export function Restaurants() {
           contactNumber: location.contactNumber ? `+91${location.contactNumber}` : (formR.phoneNumber ? `+91${formR.phoneNumber}` : undefined),
           email: location.email || formR.email
         },
-        operatingHours: hoursArray
+        operatingHours: hoursArray,
+        restaurantCuisineIds: selectedCuisineIds
       });
       
       // Refresh the list
@@ -350,6 +374,50 @@ export function Restaurants() {
                       <Input value={formR.gstinNumber} onChange={e => setFormR({...formR, gstinNumber: e.target.value})} placeholder="22AAAAA0000A1Z5" />
                     </div>
                   </div>
+                  
+                  {/* Cuisine Selection */}
+                  <div className="mt-4">
+                    <label className="text-sm font-medium">Cuisines *</label>
+                    <p className="text-xs text-muted-foreground mb-2">Select at least one cuisine (multiple selection allowed)</p>
+                    <div className="border rounded-md p-4 max-h-48 overflow-y-auto bg-muted/20">
+                      {cuisines.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Loading cuisines...</p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          {cuisines.map((cuisine) => (
+                            <label key={cuisine.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/40 p-2 rounded">
+                              <input
+                                type="checkbox"
+                                checked={selectedCuisineIds.includes(cuisine.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedCuisineIds([...selectedCuisineIds, cuisine.id]);
+                                  } else {
+                                    setSelectedCuisineIds(selectedCuisineIds.filter(id => id !== cuisine.id));
+                                  }
+                                }}
+                                className="h-4 w-4"
+                              />
+                              <span className="text-sm">{cuisine.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {selectedCuisineIds.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {selectedCuisineIds.map(id => {
+                          const cuisine = cuisines.find(c => c.id === id);
+                          return cuisine ? (
+                            <Badge key={id} variant="secondary" className="text-xs">
+                              {cuisine.name}
+                            </Badge>
+                          ) : null;
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  
                   <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                     <p className="text-sm text-green-800">
                       <strong>Note:</strong> Restaurants onboarded by admins are automatically approved and verified.
@@ -500,7 +568,7 @@ export function Restaurants() {
               </div>
               {!isFormValid() && (
                 <p className="text-xs text-amber-600 text-right mt-2">
-                  Please fill all required fields including address coordinates
+                  Please fill all required fields including address coordinates and at least one cuisine
                 </p>
               )}
             </DialogContent>
@@ -648,6 +716,20 @@ export function Restaurants() {
                   </div>
                 </div>
               </div>
+
+              {/* Cuisines */}
+              {selectedRestaurant.cuisines && selectedRestaurant.cuisines.length > 0 && (
+                <div>
+                  <h3 className="font-semibold mb-3">Cuisines</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedRestaurant.cuisines.map((cuisine: any) => (
+                      <Badge key={cuisine.id} variant="secondary">
+                        {cuisine.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* IDs */}
               <div>

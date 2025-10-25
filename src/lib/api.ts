@@ -93,6 +93,7 @@ export const adminApi = {
   },
   getAllRestaurants: (search?: string) => 
     apiRequest<any[]>(`/admin/restaurants${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  getAllCuisines: () => apiRequest<Array<{ id: number; name: string }>>('/admin/cuisines'),
   // Onboard new restaurant (single transaction)
   onboardRestaurant: (body: {
     phoneNumber?: string;
@@ -124,6 +125,7 @@ export const adminApi = {
       closeTime: string | null;
       isClosed: boolean;
     }>;
+    restaurantCuisineIds: number[];
   }) => apiRequest<{ message: string; restaurant_id: string; status: string }>(
     '/admin/restaurants',
     { method: 'POST', body: JSON.stringify(body) }
