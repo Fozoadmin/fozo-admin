@@ -13,7 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, User } from "lucide-react";
+import { Search, User, Trash2 } from "lucide-react";
+import { DialogDescription } from "@/components/ui/dialog";
 
 export function Customers() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -24,6 +25,10 @@ export function Customers() {
   // Detail popup
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [openDetail, setOpenDetail] = useState(false);
+  
+  // Delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchCustomers();
@@ -54,6 +59,31 @@ export function Customers() {
   const openCustomerDetail = (customer: any) => {
     setSelectedCustomer(customer);
     setOpenDetail(true);
+  };
+
+  const openDeleteDialog = (customer: any) => {
+    setSelectedCustomer(customer);
+    setDeleteConfirm(true);
+  };
+
+  const handleDelete = async () => {
+    if (!selectedCustomer) return;
+    
+    try {
+      setDeleting(true);
+      await adminApi.deleteUser(selectedCustomer.id);
+      
+      // Refresh list
+      await fetchCustomers(searchTerm);
+      setDeleteConfirm(false);
+      setSelectedCustomer(null);
+      alert("Customer deleted successfully!");
+    } catch (error: any) {
+      console.error('Delete failed', error);
+      alert(`Failed to delete customer: ${error?.message || error}`);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -96,16 +126,15 @@ export function Customers() {
                   <TableHead>Status</TableHead>
                   <TableHead>Verified</TableHead>
                   <TableHead>Joined</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {customers.map((c) => (
                   <TableRow 
-                    key={c.id} 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => openCustomerDetail(c)}
+                    key={c.id}
                   >
-                    <TableCell className="font-medium">{c.full_name || 'N/A'}</TableCell>
+                    <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => openCustomerDetail(c)}>{c.full_name || 'N/A'}</TableCell>
                     <TableCell>{c.email || 'N/A'}</TableCell>
                     <TableCell>{c.phone_number || 'N/A'}</TableCell>
                     <TableCell>
@@ -122,6 +151,16 @@ export function Customers() {
                       </Badge>
                     </TableCell>
                     <TableCell>{c.created_at ? new Date(c.created_at).toLocaleDateString() : 'N/A'}</TableCell>
+                    <TableCell className="text-right">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => openDeleteDialog(c)}
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -191,6 +230,35 @@ export function Customers() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirm} onOpenChange={setDeleteConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{selectedCustomer?.full_name || selectedCustomer?.email || 'this customer'}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+            <p className="text-sm text-destructive font-medium">⚠️ Warning</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              This action cannot be undone. This will permanently delete the customer
+              account and all associated data.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setDeleteConfirm(false)}>Cancel</Button>
+            <Button 
+              variant="destructive"
+              disabled={deleting} 
+              onClick={handleDelete}
+            >
+              {deleting ? 'Deleting...' : 'Delete Customer'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

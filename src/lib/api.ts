@@ -93,6 +93,7 @@ export const adminApi = {
   },
   getAllRestaurants: (search?: string) => 
     apiRequest<any[]>(`/admin/restaurants${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  getRestaurantById: (id: string) => apiRequest<any>(`/admin/restaurants/${id}`),
   getAllCuisines: () => apiRequest<Array<{ id: number; name: string }>>('/admin/cuisines'),
   // Onboard new restaurant (single transaction)
   onboardRestaurant: (body: {
@@ -205,7 +206,37 @@ export const adminApi = {
     method: 'PUT',
     body: JSON.stringify({ status, documentsVerified }),
   }),
+  updateRestaurantCuisines: (restaurantId: string, cuisineIds: number[]) => 
+    apiRequest<{ message: string }>(`/admin/restaurants/${restaurantId}/cuisines`, {
+      method: 'PUT',
+      body: JSON.stringify({ cuisineIds }),
+    }),
+  deleteRestaurant: (restaurantId: string) => 
+    apiRequest<{ message: string }>(`/admin/restaurants/${restaurantId}`, {
+      method: 'DELETE',
+    }),
+  deleteUser: (userId: string) => 
+    apiRequest<{ message: string }>(`/admin/users/${userId}`, {
+      method: 'DELETE',
+    }),
   // Delivery Partner Admin Updates
+  updateDeliveryPartner: (
+    dpUserId: string,
+    profileData: {
+      fullName?: string;
+      vehicleType?: 'bicycle' | 'scooter' | 'motorcycle' | 'car';
+      licenseNumber?: string;
+      bankAccountDetails?: {
+        accountNumber: string;
+        ifscCode: string;
+        accountHolderName: string;
+        bankName: string;
+      };
+    }
+  ) => apiRequest(`/admin/delivery-partners/${dpUserId}`, {
+    method: 'PUT',
+    body: JSON.stringify(profileData),
+  }),
   updateDeliveryPartnerStatus: (
     dpUserId: string,
     status: 'pending' | 'approved' | 'rejected' | 'suspended',

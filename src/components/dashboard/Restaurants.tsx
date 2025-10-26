@@ -14,7 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, MapPin, Loader2, Search, Building2 } from "lucide-react";
+import { Plus, MapPin, Loader2, Search, Building2, Edit, Trash2, CheckCircle2, XCircle, Ban } from "lucide-react";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
@@ -34,6 +36,14 @@ export function Restaurants() {
   // Detail popup
   const [selectedRestaurant, setSelectedRestaurant] = useState<any | null>(null);
   const [openDetail, setOpenDetail] = useState(false);
+  
+  // Edit mode
+  const [openEdit, setOpenEdit] = useState(false);
+  const [editing, setEditing] = useState(false);
+  
+  // Delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   
   // Cuisines
   const [cuisines, setCuisines] = useState<Array<{ id: number; name: string }>>([]);
@@ -300,6 +310,176 @@ export function Restaurants() {
     }));
   };
 
+  const openEditDialog = async (restaurant: any) => {
+    try {
+      // Fetch full restaurant details including location and operating hours
+      const fullDetails = await adminApi.getRestaurantById(restaurant.restaurant_id);
+      setSelectedRestaurant(fullDetails);
+      
+      // Pre-fill form with existing data
+      setFormR({
+        fullName: fullDetails.user_full_name || "",
+        email: fullDetails.user_email || "",
+        phoneNumber: fullDetails.phone_number?.replace('+91', '') || "",
+        password: "", // Don't pre-fill password
+        restaurantName: fullDetails.restaurant_name || "",
+        contactPersonName: fullDetails.contact_person_name || "",
+        fssaiLicenseNumber: fullDetails.fssai_license_number || "",
+        gstinNumber: fullDetails.gstin_number || ""
+      });
+      
+      // Pre-fill location
+      if (fullDetails.primary_location) {
+        setLocation({
+          locationName: fullDetails.primary_location.location_name || "",
+          address: fullDetails.primary_location.address || "",
+          latitude: fullDetails.primary_location.latitude?.toString() || "",
+          longitude: fullDetails.primary_location.longitude?.toString() || "",
+          contactNumber: fullDetails.primary_location.contact_number?.replace('+91', '') || "",
+          email: fullDetails.primary_location.email || ""
+        });
+      }
+      
+      // Pre-fill operating hours
+      if (fullDetails.operating_hours) {
+        const hours: Record<string, {open: string, close: string, isClosed: boolean}> = {};
+        DAYS_OF_WEEK.forEach(day => {
+          const dayData = fullDetails.operating_hours[day];
+          if (dayData) {
+            hours[day] = {
+              open: dayData.open_time?.substring(0, 5) || "09:00",
+              close: dayData.close_time?.substring(0, 5) || "22:00",
+              isClosed: dayData.is_closed || false
+            };
+          } else {
+            hours[day] = { open: "09:00", close: "22:00", isClosed: false };
+          }
+        });
+        setOperatingHours(hours);
+      }
+      
+      // Pre-fill bank details
+      if (fullDetails.bank_account_details) {
+        setBankDetails({
+          accountNumber: fullDetails.bank_account_details.accountNumber || "",
+          ifscCode: fullDetails.bank_account_details.ifscCode || "",
+          accountHolderName: fullDetails.bank_account_details.accountHolderName || "",
+          bankName: fullDetails.bank_account_details.bankName || ""
+        });
+      }
+      
+      // Pre-fill cuisines
+      setSelectedCuisineIds(fullDetails.cuisines ? fullDetails.cuisines.map((c: any) => c.id) : []);
+      
+      setOpenEdit(true);
+    } catch (error) {
+      console.error('Error loading restaurant details:', error);
+      alert('Failed to load restaurant details');
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedRestaurant) return;
+    
+    try {
+      setEditing(true);
+      
+      // Validate cuisines
+      if (selectedCuisineIds.length === 0) {
+        alert("Please select at least one cuisine");
+        return;
+      }
+      
+      // Build bank details object if any field is provided
+      const bankAccountDetails = (bankDetails.accountNumber || bankDetails.ifscCode) ? {
+        accountNumber: bankDetails.accountNumber,
+        ifscCode: bankDetails.ifscCode,
+        accountHolderName: bankDetails.accountHolderName,
+        bankName: bankDetails.bankName
+      } : undefined;
+      
+      // Build operating hours array
+      const hoursArray = DAYS_OF_WEEK.map(day => ({
+        day_of_week: day,
+        open_time: operatingHours[day].isClosed ? null : operatingHours[day].open + ':00',
+        close_time: operatingHours[day].isClosed ? null : operatingHours[day].close + ':00',
+        is_closed: operatingHours[day].isClosed
+      }));
+      
+      // Update restaurant profile (basic info, location, hours, bank)
+      await adminApi.updateRestaurantProfile(selectedRestaurant.restaurant_id, {
+        restaurantName: formR.restaurantName,
+        contactPersonName: formR.contactPersonName,
+        fssaiLicenseNumber: formR.fssaiLicenseNumber || undefined,
+        gstinNumber: formR.gstinNumber || undefined,
+        bankAccountDetails,
+        primaryLocation: {
+          locationName: location.locationName || formR.restaurantName,
+          address: location.address,
+          latitude: parseFloat(location.latitude),
+          longitude: parseFloat(location.longitude),
+          contactNumber: location.contactNumber ? `+91${location.contactNumber}` : undefined,
+          email: location.email || undefined
+        },
+        operatingHours: hoursArray
+      });
+      
+      // Update cuisines
+      await adminApi.updateRestaurantCuisines(selectedRestaurant.restaurant_id, selectedCuisineIds);
+      
+      // Refresh list
+      const updatedRestaurants = await adminApi.getAllRestaurants();
+      setRestaurants(updatedRestaurants);
+      setOpenEdit(false);
+      resetForm();
+      alert("Restaurant updated successfully!");
+    } catch (error) {
+      console.error('Update failed', error);
+      alert(`Failed to update restaurant: ${error}`);
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  const openDeleteDialog = (restaurant: any) => {
+    setSelectedRestaurant(restaurant);
+    setDeleteConfirm(true);
+  };
+
+  const handleDelete = async () => {
+    if (!selectedRestaurant) return;
+    
+    try {
+      setDeleting(true);
+      await adminApi.deleteRestaurant(selectedRestaurant.restaurant_id);
+      
+      // Refresh list
+      const updatedRestaurants = await adminApi.getAllRestaurants();
+      setRestaurants(updatedRestaurants);
+      setDeleteConfirm(false);
+      setSelectedRestaurant(null);
+      alert("Restaurant deleted successfully!");
+    } catch (error) {
+      console.error('Delete failed', error);
+      alert(`Failed to delete restaurant: ${error}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleStatusChange = async (restaurantId: string, newStatus: string) => {
+    try {
+      await adminApi.updateRestaurantStatus(restaurantId, newStatus as any);
+      
+      // Refresh list
+      const updatedRestaurants = await adminApi.getAllRestaurants();
+      setRestaurants(updatedRestaurants);
+    } catch (error) {
+      console.error('Status update failed', error);
+      alert(`Failed to update status: ${error}`);
+    }
+  };
+
   return (
     <div className="grid gap-4">
       <Card className="rounded-2xl">
@@ -377,45 +557,16 @@ export function Restaurants() {
                   
                   {/* Cuisine Selection */}
                   <div className="mt-4">
-                    <label className="text-sm font-medium">Cuisines *</label>
-                    <p className="text-xs text-muted-foreground mb-2">Select at least one cuisine (multiple selection allowed)</p>
-                    <div className="border rounded-md p-4 max-h-48 overflow-y-auto bg-muted/20">
-                      {cuisines.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">Loading cuisines...</p>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-2">
-                          {cuisines.map((cuisine) => (
-                            <label key={cuisine.id} className="flex items-center gap-2 cursor-pointer hover:bg-muted/40 p-2 rounded">
-                              <input
-                                type="checkbox"
-                                checked={selectedCuisineIds.includes(cuisine.id)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedCuisineIds([...selectedCuisineIds, cuisine.id]);
-                                  } else {
-                                    setSelectedCuisineIds(selectedCuisineIds.filter(id => id !== cuisine.id));
-                                  }
-                                }}
-                                className="h-4 w-4"
-                              />
-                              <span className="text-sm">{cuisine.name}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    {selectedCuisineIds.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {selectedCuisineIds.map(id => {
-                          const cuisine = cuisines.find(c => c.id === id);
-                          return cuisine ? (
-                            <Badge key={id} variant="secondary" className="text-xs">
-                              {cuisine.name}
-                            </Badge>
-                          ) : null;
-                        })}
-                      </div>
-                    )}
+                    <MultiSelect
+                      label="Cuisines *"
+                      options={cuisines}
+                      selected={selectedCuisineIds}
+                      onChange={setSelectedCuisineIds}
+                      placeholder="Select cuisines..."
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Search and select multiple cuisines. At least one is required.
+                    </p>
                   </div>
                   
                   <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -609,33 +760,76 @@ export function Restaurants() {
                   <TableHead>Status</TableHead>
                   <TableHead>Rating</TableHead>
                   <TableHead>Verified</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {restaurants.map((r) => (
                   <TableRow 
                     key={r.restaurant_id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => openRestaurantDetail(r)}
                   >
-                    <TableCell className="font-medium">{r.restaurant_name || 'N/A'}</TableCell>
+                    <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => openRestaurantDetail(r)}>{r.restaurant_name || 'N/A'}</TableCell>
                     <TableCell>{r.contact_person_name || 'N/A'}</TableCell>
                     <TableCell>{r.user_email || 'N/A'}</TableCell>
                     <TableCell>{r.phone_number || 'N/A'}</TableCell>
                     <TableCell>
-                      <Badge variant={
-                        r.status === "approved" ? "default" :
-                        r.status === "rejected" ? "destructive" :
-                        "secondary"
-                      }>
-                        {r.status || 'pending'}
-                      </Badge>
+                      <Select value={r.status || 'pending'} onValueChange={(value) => handleStatusChange(r.restaurant_id, value)}>
+                        <SelectTrigger className="w-[130px] h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">
+                            <div className="flex items-center gap-2">
+                              <div className="h-2 w-2 rounded-full bg-yellow-500"></div>
+                              Pending
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="approved">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="h-3 w-3 text-green-600" />
+                              Approved
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="rejected">
+                            <div className="flex items-center gap-2">
+                              <XCircle className="h-3 w-3 text-red-600" />
+                              Rejected
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="suspended">
+                            <div className="flex items-center gap-2">
+                              <Ban className="h-3 w-3 text-orange-600" />
+                              Suspended
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>{r.average_rating || 'N/A'}</TableCell>
                     <TableCell>
                       <Badge variant={r.documents_verified ? "default" : "secondary"}>
                         {r.documents_verified ? "Yes" : "No"}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-2 justify-end">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => openEditDialog(r)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => openDeleteDialog(r)}
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -747,6 +941,249 @@ export function Restaurants() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Restaurant Dialog */}
+      <Dialog open={openEdit} onOpenChange={(open) => { 
+        setOpenEdit(open); 
+        if (!open) resetForm(); 
+      }}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Restaurant</DialogTitle>
+            <DialogDescription>
+              Update details for {selectedRestaurant?.restaurant_name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-5">
+              <TabsTrigger value="basic">Basic Info</TabsTrigger>
+              <TabsTrigger value="location">Location</TabsTrigger>
+              <TabsTrigger value="hours">Hours</TabsTrigger>
+              <TabsTrigger value="cuisines">Cuisines</TabsTrigger>
+              <TabsTrigger value="bank">Bank</TabsTrigger>
+            </TabsList>
+            
+            {/* Basic Info Tab */}
+            <TabsContent value="basic" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Restaurant Name *</label>
+                  <Input value={formR.restaurantName} onChange={e => setFormR({...formR, restaurantName: e.target.value})} placeholder="Tasty Bites" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Contact Person</label>
+                  <Input value={formR.contactPersonName} onChange={e => setFormR({...formR, contactPersonName: e.target.value})} placeholder="Manager name" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Email</label>
+                  <Input type="email" value={formR.email} disabled className="bg-muted cursor-not-allowed" />
+                  <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Phone Number</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium px-3 py-2 bg-muted rounded-md">+91</span>
+                    <Input value={formR.phoneNumber} disabled className="bg-muted cursor-not-allowed" />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Phone cannot be changed</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">FSSAI License</label>
+                  <Input value={formR.fssaiLicenseNumber} onChange={e => setFormR({...formR, fssaiLicenseNumber: e.target.value})} placeholder="12345678901234" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">GSTIN</label>
+                  <Input value={formR.gstinNumber} onChange={e => setFormR({...formR, gstinNumber: e.target.value})} placeholder="22AAAAA0000A1Z5" />
+                </div>
+              </div>
+            </TabsContent>
+            
+            {/* Location Tab */}
+            <TabsContent value="location" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Location Name</label>
+                  <Input value={location.locationName} onChange={e => setLocation({...location, locationName: e.target.value})} placeholder="Main Branch" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Address *</label>
+                  <Input value={location.address} onChange={e => setLocation({...location, address: e.target.value})} placeholder="123 Main Street, City, State - 400001" />
+                  <p className="text-xs text-muted-foreground mt-1">Enter the full address and click below to update coordinates</p>
+                </div>
+                <div className="col-span-2">
+                  <Button 
+                    type="button"
+                    onClick={handleGeocodeAddress} 
+                    disabled={!location.address || geocoding}
+                    className="w-full gap-2"
+                    variant="secondary"
+                  >
+                    {geocoding ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Getting Coordinates...
+                      </>
+                    ) : (
+                      <>
+                        <MapPin className="h-4 w-4" />
+                        Update Coordinates from Address
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Latitude *</label>
+                  <Input 
+                    type="text" 
+                    value={location.latitude} 
+                    readOnly 
+                    className="bg-muted cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Longitude *</label>
+                  <Input 
+                    type="text" 
+                    value={location.longitude} 
+                    readOnly 
+                    className="bg-muted cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Location Contact</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium px-3 py-2 bg-muted rounded-md">+91</span>
+                    <Input 
+                      value={location.contactNumber} 
+                      onChange={e => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        if (value.length <= 10) {
+                          setLocation({...location, contactNumber: value});
+                        }
+                      }}
+                      placeholder="9876543210"
+                      maxLength={10}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Location Email</label>
+                  <Input type="email" value={location.email} onChange={e => setLocation({...location, email: e.target.value})} placeholder="branch@restaurant.com" />
+                </div>
+              </div>
+            </TabsContent>
+            
+            {/* Operating Hours Tab */}
+            <TabsContent value="hours" className="space-y-2">
+              {DAYS_OF_WEEK.map(day => (
+                <div key={day} className="flex items-center gap-4 p-2 border rounded">
+                  <div className="w-24 font-medium capitalize">{day}</div>
+                  <input 
+                    type="checkbox" 
+                    checked={operatingHours[day].isClosed} 
+                    onChange={(e) => updateOperatingHours(day, 'isClosed', e.target.checked)}
+                    className="h-4 w-4"
+                  />
+                  <label className="text-sm">Closed</label>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      type="time" 
+                      value={operatingHours[day].open} 
+                      onChange={(e) => updateOperatingHours(day, 'open', e.target.value)}
+                      disabled={operatingHours[day].isClosed}
+                      className="w-32"
+                    />
+                    <span>to</span>
+                    <Input 
+                      type="time" 
+                      value={operatingHours[day].close} 
+                      onChange={(e) => updateOperatingHours(day, 'close', e.target.value)}
+                      disabled={operatingHours[day].isClosed}
+                      className="w-32"
+                    />
+                  </div>
+                </div>
+              ))}
+            </TabsContent>
+            
+            {/* Cuisines Tab */}
+            <TabsContent value="cuisines" className="space-y-4">
+              <MultiSelect
+                label="Cuisines *"
+                options={cuisines}
+                selected={selectedCuisineIds}
+                onChange={setSelectedCuisineIds}
+                placeholder="Select cuisines..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Search and select multiple cuisines. At least one is required.
+              </p>
+            </TabsContent>
+            
+            {/* Bank Details Tab */}
+            <TabsContent value="bank" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Account Holder Name</label>
+                  <Input value={bankDetails.accountHolderName} onChange={e => setBankDetails({...bankDetails, accountHolderName: e.target.value})} placeholder="John Doe" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Bank Name</label>
+                  <Input value={bankDetails.bankName} onChange={e => setBankDetails({...bankDetails, bankName: e.target.value})} placeholder="HDFC Bank" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Account Number</label>
+                  <Input value={bankDetails.accountNumber} onChange={e => setBankDetails({...bankDetails, accountNumber: e.target.value})} placeholder="1234567890" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">IFSC Code</label>
+                  <Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} placeholder="HDFC0001234" />
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+          
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => { setOpenEdit(false); resetForm(); }}>Cancel</Button>
+            <Button 
+              disabled={editing || !formR.restaurantName} 
+              onClick={handleUpdate}
+            >
+              {editing ? 'Updating...' : 'Update Restaurant'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirm} onOpenChange={setDeleteConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{selectedRestaurant?.restaurant_name}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+            <p className="text-sm text-destructive font-medium">⚠️ Warning</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              This action cannot be undone. This will permanently delete the restaurant,
+              all its data, and the associated user account.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setDeleteConfirm(false)}>Cancel</Button>
+            <Button 
+              variant="destructive"
+              disabled={deleting} 
+              onClick={handleDelete}
+            >
+              {deleting ? 'Deleting...' : 'Delete Restaurant'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
