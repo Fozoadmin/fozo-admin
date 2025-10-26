@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Bike } from "lucide-react";
+import { Plus, Bike, Trash2, Edit, CheckCircle2, XCircle, Ban } from "lucide-react";
 
 export function DeliveryPartners() {
   const [deliveryPartners, setDeliveryPartners] = useState<any[]>([]);
@@ -26,6 +26,14 @@ export function DeliveryPartners() {
   // Detail popup
   const [selectedDP, setSelectedDP] = useState<any | null>(null);
   const [openDetail, setOpenDetail] = useState(false);
+  
+  // Delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  
+  // Edit mode
+  const [openEdit, setOpenEdit] = useState(false);
+  const [editing, setEditing] = useState(false);
   
   const [formD, setFormD] = useState({
     fullName: "",
@@ -136,6 +144,119 @@ export function DeliveryPartners() {
       alert(`Failed to create delivery partner: ${err}`);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openEditDialog = (dp: any) => {
+    setSelectedDP(dp);
+    
+    // Pre-fill form with existing data
+    setFormD({
+      fullName: dp.full_name || "",
+      email: dp.email || "",
+      phoneNumber: dp.phone_number?.replace('+91', '') || "",
+      password: "", // Don't pre-fill password
+      vehicleType: dp.vehicle_type || "bicycle",
+      licenseNumber: dp.license_number || ""
+    });
+    
+    // Pre-fill bank details
+    if (dp.bank_account_details) {
+      setBankDetails({
+        accountNumber: dp.bank_account_details.accountNumber || "",
+        ifscCode: dp.bank_account_details.ifscCode || "",
+        accountHolderName: dp.bank_account_details.accountHolderName || "",
+        bankName: dp.bank_account_details.bankName || ""
+      });
+    } else {
+      setBankDetails({
+        accountNumber: "",
+        ifscCode: "",
+        accountHolderName: "",
+        bankName: ""
+      });
+    }
+    
+    setOpenEdit(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedDP) return;
+    
+    try {
+      setEditing(true);
+      
+      if (!formD.fullName || !formD.vehicleType) {
+        alert("Please fill in all required fields (Name and Vehicle Type)");
+        return;
+      }
+      
+      // Build bank details object if any field is provided
+      const bankAccountDetails = (bankDetails.accountNumber || bankDetails.ifscCode) ? {
+        accountNumber: bankDetails.accountNumber,
+        ifscCode: bankDetails.ifscCode,
+        accountHolderName: bankDetails.accountHolderName,
+        bankName: bankDetails.bankName
+      } : undefined;
+      
+      // Update delivery partner
+      await adminApi.updateDeliveryPartner(selectedDP.user_id, {
+        fullName: formD.fullName,
+        vehicleType: formD.vehicleType,
+        licenseNumber: formD.licenseNumber || undefined,
+        bankAccountDetails
+      });
+      
+      // Refresh list
+      const updatedDPs = await adminApi.getAllDeliveryPartners();
+      setDeliveryPartners(updatedDPs);
+      setOpenEdit(false);
+      resetForm();
+      alert("Delivery Partner updated successfully!");
+    } catch (error) {
+      console.error('Update failed', error);
+      alert(`Failed to update delivery partner: ${error}`);
+    } finally {
+      setEditing(false);
+    }
+  };
+
+  const openDeleteDialog = (dp: any) => {
+    setSelectedDP(dp);
+    setDeleteConfirm(true);
+  };
+
+  const handleDelete = async () => {
+    if (!selectedDP) return;
+    
+    try {
+      setDeleting(true);
+      await adminApi.deleteUser(selectedDP.user_id);
+      
+      // Refresh list
+      const updatedDPs = await adminApi.getAllDeliveryPartners();
+      setDeliveryPartners(updatedDPs);
+      setDeleteConfirm(false);
+      setSelectedDP(null);
+      alert("Delivery Partner deleted successfully!");
+    } catch (error: any) {
+      console.error('Delete failed', error);
+      alert(`Failed to delete delivery partner: ${error?.message || error}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleStatusChange = async (dpUserId: string, newStatus: string) => {
+    try {
+      await adminApi.updateDeliveryPartnerStatus(dpUserId, newStatus as any);
+      
+      // Refresh list
+      const updatedDPs = await adminApi.getAllDeliveryPartners();
+      setDeliveryPartners(updatedDPs);
+    } catch (error) {
+      console.error('Status update failed', error);
+      alert(`Failed to update status: ${error}`);
     }
   };
 
@@ -280,27 +401,50 @@ export function DeliveryPartners() {
                   <TableHead>Status</TableHead>
                   <TableHead>Online</TableHead>
                   <TableHead>Verified</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {deliveryPartners.map((d) => (
                   <TableRow 
                     key={d.user_id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => { setSelectedDP(d); setOpenDetail(true); }}
                   >
-                    <TableCell className="font-medium">{d.full_name || 'N/A'}</TableCell>
+                    <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => { setSelectedDP(d); setOpenDetail(true); }}>{d.full_name || 'N/A'}</TableCell>
                     <TableCell>{d.email || 'N/A'}</TableCell>
                     <TableCell>{d.phone_number || 'N/A'}</TableCell>
                     <TableCell className="capitalize">{d.vehicle_type || 'N/A'}</TableCell>
                     <TableCell>
-                      <Badge variant={
-                        d.status === "approved" ? "default" :
-                        d.status === "rejected" ? "destructive" :
-                        "secondary"
-                      }>
-                        {d.status || 'pending'}
-                      </Badge>
+                      <Select value={d.status || 'pending'} onValueChange={(value) => handleStatusChange(d.user_id, value)}>
+                        <SelectTrigger className="w-[130px] h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">
+                            <div className="flex items-center gap-2">
+                              <div className="h-2 w-2 rounded-full bg-yellow-500"></div>
+                              Pending
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="approved">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="h-3 w-3 text-green-600" />
+                              Approved
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="rejected">
+                            <div className="flex items-center gap-2">
+                              <XCircle className="h-3 w-3 text-red-600" />
+                              Rejected
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="suspended">
+                            <div className="flex items-center gap-2">
+                              <Ban className="h-3 w-3 text-orange-600" />
+                              Suspended
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>
                       <Badge variant={d.is_online ? "default" : "secondary"}>
@@ -311,6 +455,26 @@ export function DeliveryPartners() {
                       <Badge variant={d.documents_verified ? "default" : "secondary"}>
                         {d.documents_verified ? "Yes" : "No"}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-2 justify-end">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => openEditDialog(d)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => openDeleteDialog(d)}
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -401,6 +565,130 @@ export function DeliveryPartners() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Delivery Partner Dialog */}
+      <Dialog open={openEdit} onOpenChange={(open) => { 
+        setOpenEdit(open); 
+        if (!open) resetForm(); 
+      }}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Delivery Partner</DialogTitle>
+            <DialogDescription>
+              Update details for {selectedDP?.full_name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="basic">Basic Info & Vehicle</TabsTrigger>
+              <TabsTrigger value="bank">Bank Details</TabsTrigger>
+            </TabsList>
+            
+            {/* Basic Info Tab */}
+            <TabsContent value="basic" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Full Name *</label>
+                  <Input value={formD.fullName} onChange={e => setFormD({...formD, fullName: e.target.value})} placeholder="John Doe" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Vehicle Type *</label>
+                  <Select value={formD.vehicleType} onValueChange={(value: any) => setFormD({...formD, vehicleType: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select vehicle" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bicycle">Bicycle</SelectItem>
+                      <SelectItem value="scooter">Scooter</SelectItem>
+                      <SelectItem value="motorcycle">Motorcycle</SelectItem>
+                      <SelectItem value="car">Car</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Email</label>
+                  <Input type="email" value={formD.email} disabled className="bg-muted cursor-not-allowed" />
+                  <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Phone Number</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium px-3 py-2 bg-muted rounded-md">+91</span>
+                    <Input value={formD.phoneNumber} disabled className="bg-muted cursor-not-allowed" />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Phone cannot be changed</p>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">License Number</label>
+                  <Input value={formD.licenseNumber} onChange={e => setFormD({...formD, licenseNumber: e.target.value})} placeholder="DL12345678" />
+                </div>
+              </div>
+            </TabsContent>
+            
+            {/* Bank Details Tab */}
+            <TabsContent value="bank" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Account Holder Name</label>
+                  <Input value={bankDetails.accountHolderName} onChange={e => setBankDetails({...bankDetails, accountHolderName: e.target.value})} placeholder="John Doe" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Bank Name</label>
+                  <Input value={bankDetails.bankName} onChange={e => setBankDetails({...bankDetails, bankName: e.target.value})} placeholder="HDFC Bank" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Account Number</label>
+                  <Input value={bankDetails.accountNumber} onChange={e => setBankDetails({...bankDetails, accountNumber: e.target.value})} placeholder="1234567890" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">IFSC Code</label>
+                  <Input value={bankDetails.ifscCode} onChange={e => setBankDetails({...bankDetails, ifscCode: e.target.value})} placeholder="HDFC0001234" />
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+          
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => { setOpenEdit(false); resetForm(); }}>Cancel</Button>
+            <Button 
+              disabled={editing || !formD.fullName || !formD.vehicleType} 
+              onClick={handleUpdate}
+            >
+              {editing ? 'Updating...' : 'Update Partner'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirm} onOpenChange={setDeleteConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{selectedDP?.full_name || selectedDP?.email || 'this delivery partner'}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+            <p className="text-sm text-destructive font-medium">⚠️ Warning</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              This action cannot be undone. This will permanently delete the delivery partner
+              account and all associated data.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setDeleteConfirm(false)}>Cancel</Button>
+            <Button 
+              variant="destructive"
+              disabled={deleting} 
+              onClick={handleDelete}
+            >
+              {deleting ? 'Deleting...' : 'Delete Delivery Partner'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
