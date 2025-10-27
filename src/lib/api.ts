@@ -155,6 +155,7 @@ export const adminApi = {
     { method: 'POST', body: JSON.stringify(body) }
   ),
   getAllSurpriseBags: () => apiRequest<any[]>('/admin/bags'),
+  getGroupedSurpriseBags: () => apiRequest<any[]>('/admin/bags/grouped'),
   createSurpriseBag: (body: {
     targetRestaurantId: string; // admin creating for a specific restaurant
     bagName: string;

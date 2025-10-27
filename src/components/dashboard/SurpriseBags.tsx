@@ -13,10 +13,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, X } from "lucide-react";
+import { Plus, Search, X, ChevronDown, ChevronRight } from "lucide-react";
 
 export function SurpriseBags() {
-  const [bags, setBags] = useState<any[]>([]);
+  const [groupedRestaurants, setGroupedRestaurants] = useState<any[]>([]);
+  const [expandedRestaurants, setExpandedRestaurants] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [openAdd, setOpenAdd] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -45,9 +46,9 @@ export function SurpriseBags() {
     
     const fetchData = async () => {
       try {
-        const bagsData = await adminApi.getAllSurpriseBags();
+        const groupedData = await adminApi.getGroupedSurpriseBags();
         if (!isMounted) return;
-        setBags(bagsData);
+        setGroupedRestaurants(groupedData);
       } catch (error) {
         if (!isMounted) return;
         console.error('Error fetching surprise bags:', error);
@@ -64,6 +65,18 @@ export function SurpriseBags() {
       isMounted = false;
     };
   }, []);
+
+  const toggleRestaurant = (restaurantId: string) => {
+    setExpandedRestaurants(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(restaurantId)) {
+        newSet.delete(restaurantId);
+      } else {
+        newSet.add(restaurantId);
+      }
+      return newSet;
+    });
+  };
 
   // Search restaurants
   const handleSearchRestaurants = async () => {
@@ -145,7 +158,7 @@ export function SurpriseBags() {
         isActive: formB.isActive
       });
       
-      setBags(await adminApi.getAllSurpriseBags());
+      setGroupedRestaurants(await adminApi.getGroupedSurpriseBags());
       setOpenAdd(false);
       resetForm();
       alert("Surprise bag created successfully!");
@@ -345,45 +358,79 @@ export function SurpriseBags() {
         <CardContent>
           {loading ? (
             <div className="text-center py-8">Loading surprise bags...</div>
-          ) : bags.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No surprise bags found</div>
+          ) : groupedRestaurants.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No restaurants with surprise bags found</div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Bag Name</TableHead>
-                  <TableHead>Restaurant</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Worth</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Pickup Time</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {bags.map((bag) => (
-                  <TableRow key={bag.id} className="cursor-pointer hover:bg-muted/50">
-                    <TableCell className="font-medium">{bag.bag_name || 'N/A'}</TableCell>
-                    <TableCell>{bag.restaurant_id?.substring(0, 8) || 'N/A'}</TableCell>
-                    <TableCell>₹{Number(bag.denomination_value || 0).toFixed(2)}</TableCell>
-                    <TableCell>₹{Number(bag.actual_worth || 0).toFixed(2)}</TableCell>
-                    <TableCell>{bag.quantity_available || 0}</TableCell>
-                    <TableCell className="text-sm">
-                      {bag.pickup_start_time && bag.pickup_end_time 
-                        ? `${bag.pickup_start_time?.substring(0, 5)} - ${bag.pickup_end_time?.substring(0, 5)}`
-                        : 'N/A'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={bag.is_active ? "default" : "secondary"}>
-                        {bag.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{bag.available_date ? new Date(bag.available_date).toLocaleDateString() : 'N/A'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="space-y-2">
+              {groupedRestaurants.map((restaurant) => (
+                <div key={restaurant.restaurant_id} className="border rounded-lg overflow-hidden">
+                  {/* Restaurant Header - Clickable to expand/collapse */}
+                  <div
+                    className="flex items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors"
+                    onClick={() => toggleRestaurant(restaurant.restaurant_id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <button className="p-1 hover:bg-muted rounded">
+                        {expandedRestaurants.has(restaurant.restaurant_id) ? (
+                          <ChevronDown className="h-5 w-5" />
+                        ) : (
+                          <ChevronRight className="h-5 w-5" />
+                        )}
+                      </button>
+                      <div>
+                        <h3 className="font-semibold text-lg">{restaurant.restaurant_name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {restaurant.restaurant_owner_phone} • {restaurant.total_bags} bag{restaurant.total_bags !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-sm">
+                      {restaurant.total_bags} Active Listing{restaurant.total_bags !== 1 ? 's' : ''}
+                    </Badge>
+                  </div>
+
+                  {/* Expanded Bags Table */}
+                  {expandedRestaurants.has(restaurant.restaurant_id) && (
+                    <div className="border-t">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Bag Name</TableHead>
+                            <TableHead>Price</TableHead>
+                            <TableHead>Worth</TableHead>
+                            <TableHead>Quantity</TableHead>
+                            <TableHead>Pickup Time</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Date</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {restaurant.bags.map((bag: any) => (
+                            <TableRow key={bag.bag_id} className="hover:bg-muted/30 font-light">
+                              <TableCell className="font-light">{bag.bag_name || 'N/A'}</TableCell>
+                              <TableCell>₹{Number(bag.denomination_value || 0).toFixed(2)}</TableCell>
+                              <TableCell>₹{Number(bag.actual_worth || 0).toFixed(2)}</TableCell>
+                              <TableCell>{bag.quantity_available || 0}</TableCell>
+                              <TableCell className="text-sm">
+                                {bag.pickup_time || 'N/A'}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={bag.is_active ? "default" : "secondary"}>
+                                  {bag.is_active ? "Active" : "Inactive"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {bag.available_date ? new Date(bag.available_date).toLocaleDateString() : 'N/A'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
