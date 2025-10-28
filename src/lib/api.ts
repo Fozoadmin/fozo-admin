@@ -168,6 +168,7 @@ export const adminApi = {
     pickupEndTime?: string;   // HH:MM:SS
     availableDate?: string;  // YYYY-MM-DD
     isActive?: boolean;
+    isVegetarian?: boolean;
   }) => apiRequest<{ message: string; bag: any }>(
     '/bags',
     { method: 'POST', body: JSON.stringify(body) }
