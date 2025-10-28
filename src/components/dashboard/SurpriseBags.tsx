@@ -38,7 +38,8 @@ export function SurpriseBags() {
     pickupStartTime: "",
     pickupEndTime: "",
     availableDate: "",
-    isActive: true
+    isActive: true,
+    isVegetarian: true
   });
 
   useEffect(() => {
@@ -118,7 +119,8 @@ export function SurpriseBags() {
       pickupStartTime: "",
       pickupEndTime: "",
       availableDate: "",
-      isActive: true
+      isActive: true,
+      isVegetarian: true
     });
     setSelectedRestaurant(null);
     setRestaurantSearch("");
@@ -155,7 +157,8 @@ export function SurpriseBags() {
         pickupStartTime: formB.pickupStartTime ? formB.pickupStartTime + ':00' : undefined,
         pickupEndTime: formB.pickupEndTime ? formB.pickupEndTime + ':00' : undefined,
         availableDate: formB.availableDate || undefined,
-        isActive: formB.isActive
+        isActive: formB.isActive,
+        isVegetarian: formB.isVegetarian
       });
       
       setGroupedRestaurants(await adminApi.getGroupedSurpriseBags());
@@ -336,6 +339,19 @@ export function SurpriseBags() {
                       />
                       <label htmlFor="bagActive" className="text-sm font-medium">Bag is Active</label>
                       <p className="text-xs text-muted-foreground">(customers can see and purchase)</p>
+                    </div>
+
+                    {/* Vegetarian Status */}
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="checkbox" 
+                        id="bagVegetarian" 
+                        checked={formB.isVegetarian} 
+                        onChange={(e) => setFormB({...formB, isVegetarian: e.target.checked})} 
+                        className="h-4 w-4" 
+                      />
+                      <label htmlFor="bagVegetarian" className="text-sm font-medium">Vegetarian Bag</label>
+                      <p className="text-xs text-muted-foreground">(mark as vegetarian option)</p>
                     </div>
                   </>
                 )}
