@@ -9,7 +9,7 @@ export function Overview() {
     totalOrders: 0,
     totalRevenue: 0,
     totalRestaurants: 0,
-    totalUsers: 0,
+    totalCustomers: 0,
     totalBags: 0,
     loading: true,
   });
@@ -22,7 +22,7 @@ export function Overview() {
         const [orders, restaurants, users, bags] = await Promise.all([
           adminApi.getAllOrders(),
           adminApi.getAllRestaurants(),
-          adminApi.getAllUsers(),
+          adminApi.getAllUsers('customer'),
           adminApi.getAllSurpriseBags(),
         ]);
 
@@ -34,7 +34,7 @@ export function Overview() {
           totalOrders: orders.orders.length,
           totalRevenue,
           totalRestaurants: restaurants.length,
-          totalUsers: users.length,
+          totalCustomers: users.length,
           totalBags: bags.length,
           loading: false,
         });
@@ -79,8 +79,8 @@ export function Overview() {
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
           <StatCard 
             icon={Users} 
-            title="Total Users" 
-            value={stats.loading ? "..." : stats.totalUsers} 
+            title="Total Customers" 
+            value={stats.loading ? "..." : stats.totalCustomers} 
           />
         </motion.div>
       </div>

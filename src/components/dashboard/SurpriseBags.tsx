@@ -277,10 +277,10 @@ export function SurpriseBags() {
                         <Input value={formB.description} onChange={(e) => setFormB({...formB, description: e.target.value})} placeholder="Brief description of the bag contents" />
                       </div>
                       
-                      <div className="col-span-2">
+                      {/* <div className="col-span-2">
                         <label className="text-sm font-medium">Image URL</label>
                         <Input value={formB.imageUrl} onChange={(e) => setFormB({...formB, imageUrl: e.target.value})} placeholder="https://example.com/image.jpg" />
-                      </div>
+                      </div> */}
                     </div>
 
                     {/* Availability */}
