@@ -310,11 +310,6 @@ export function DeliveryPartners() {
     }
   };
 
-  const formatINR = (n: number | string) =>
-    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(
-      typeof n === "string" ? Number(n) : n
-    );
-
   const timeAgo = (iso?: string | null) => {
     if (!iso) return "-";
     const d = new Date(iso);
