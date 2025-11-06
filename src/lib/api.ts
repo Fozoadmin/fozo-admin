@@ -1,6 +1,17 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const API_KEY = import.meta.env.VITE_API_KEY || '';
 
+type AdminOrderStatus =
+  | 'placed'
+  | 'pending'
+  | 'confirmed'
+  | 'ready_for_pickup'
+  | 'out_for_delivery'
+  | 'delivered'
+  | 'cancelled'
+  | 'refunded';
+
+
 interface RequestOptions extends RequestInit {
   requireAuth?: boolean;
 }
@@ -131,10 +142,14 @@ export const adminApi = {
     '/admin/restaurants',
     { method: 'POST', body: JSON.stringify(body) }
   ),
-  getAllOrders: (status?: string) => 
-    apiRequest<{ orders: any[] }>(`/admin/orders${status ? `?status=${status}` : ''}`),
-  getAllDeliveryPartners: () => apiRequest<any[]>('/admin/delivery-partners'),
-  // Onboard new delivery partner (single transaction)
+  getAllOrders: (status?: string, deliveryPartnerId?: string) => {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (deliveryPartnerId) params.append('deliveryPartnerId', deliveryPartnerId);
+    return apiRequest<{ orders: any[] }>(`/admin/orders${params.toString() ? `?${params.toString()}` : ''}`);
+  },
+  getAllDeliveryPartners: (status?: string, isOnline?: string) => 
+    apiRequest<any[]>(`/admin/delivery-partners${status ? `?status=${status}` : ''}${isOnline ? `?isOnline=${isOnline}` : ''}`),
   // Note: Delivery partners use OTP-based auth, so email and password are optional
   onboardDeliveryPartner: (body: {
     phoneNumber: string; // Required - used for OTP authentication
@@ -247,5 +262,28 @@ export const adminApi = {
     method: 'PUT',
     body: JSON.stringify({ status, documentsVerified }),
   }),
+  updateDeliveryPartnerOnlineStatus: (
+    dpId: string,
+    isOnline: boolean
+  ) => apiRequest<{ message: string; dp: any }>(`/admin/delivery-partners/${dpId}/online-status`, {
+    method: 'PUT',
+    body: JSON.stringify({ isOnline }),
+  }),
+  updateOrderStatus: (
+    orderId: string,
+    newStatus: AdminOrderStatus,
+    deliveryPartnerId?: string
+  ) =>
+    apiRequest<{ message: string; order: any }>(
+      `/orders/${orderId}/status`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          newStatus,
+          ...(deliveryPartnerId ? { deliveryPartnerId } : {}),
+        }),
+      }
+    ),
+  
 };
 

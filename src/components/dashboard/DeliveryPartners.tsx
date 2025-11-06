@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -15,7 +17,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Bike, Trash2, Edit, CheckCircle2, XCircle, Ban } from "lucide-react";
+import { Plus, Bike, Trash2, Edit, CheckCircle2, XCircle, Ban, Loader2, Copy, User2, IndianRupee, Eye } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function DeliveryPartners() {
   const [deliveryPartners, setDeliveryPartners] = useState<any[]>([]);
@@ -34,6 +37,12 @@ export function DeliveryPartners() {
   // Edit mode
   const [openEdit, setOpenEdit] = useState(false);
   const [editing, setEditing] = useState(false);
+  
+  // Orders sheet
+  const [selectedDPForOrders, setSelectedDPForOrders] = useState<any | null>(null);
+  const [dpOrders, setDpOrders] = useState<any[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [togglingOnline, setTogglingOnline] = useState<string | null>(null);
   
   const [formD, setFormD] = useState({
     fullName: "",
@@ -260,6 +269,95 @@ export function DeliveryPartners() {
     }
   };
 
+  const handleOnlineStatusToggle = async (dp: any, newStatus: boolean) => {
+    if (!dp.id) {
+      alert('Delivery partner ID not found');
+      return;
+    }
+    
+    setTogglingOnline(dp.id);
+    try {
+      await adminApi.updateDeliveryPartnerOnlineStatus(dp.id, newStatus);
+      
+      // Refresh list
+      const updatedDPs = await adminApi.getAllDeliveryPartners();
+      setDeliveryPartners(updatedDPs);
+      
+      // Update selected DP if it's the same one
+      if (selectedDPForOrders?.id === dp.id) {
+        setSelectedDPForOrders(updatedDPs.find((d: any) => d.id === dp.id));
+      }
+    } catch (error) {
+      console.error('Online status update failed', error);
+      alert(`Failed to update online status: ${error}`);
+    } finally {
+      setTogglingOnline(null);
+    }
+  };
+
+  const openOrdersSheet = async (dp: any) => {
+    setSelectedDPForOrders(dp);
+    setOrdersLoading(true);
+    try {
+      // Fetch orders for this delivery partner using delivery_partners.id
+      const response = await adminApi.getAllOrders(undefined, dp.id);
+      setDpOrders(response.orders || []);
+    } catch (error) {
+      console.error('Error fetching delivery partner orders:', error);
+      setDpOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const formatINR = (n: number | string) =>
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(
+      typeof n === "string" ? Number(n) : n
+    );
+
+  const timeAgo = (iso?: string | null) => {
+    if (!iso) return "-";
+    const d = new Date(iso);
+    const diff = Date.now() - d.getTime();
+    const minutes = Math.floor(diff / (1000 * 60));
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
+
+  const formatDateTime = (iso?: string | null) => {
+    if (!iso) return "-";
+    const d = new Date(iso);
+    return d.toLocaleString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+  const statusVariant = (s: string) => {
+    switch (s) {
+      case "delivered":
+        return "default" as const;
+      case "cancelled":
+      case "refunded":
+        return "destructive" as const;
+      case "out_for_delivery":
+      case "ready_for_pickup":
+      case "confirmed":
+      case "placed":
+        return "secondary" as const;
+      default:
+        return "outline" as const;
+    }
+  };
+
   return (
     <div className="grid gap-4">
       <Card className="rounded-2xl">
@@ -408,16 +506,24 @@ export function DeliveryPartners() {
                 {deliveryPartners.map((d) => (
                   <TableRow 
                     key={d.user_id}
+                    className="cursor-pointer hover:bg-muted/40"
+                    onClick={() => openOrdersSheet(d)}
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") openOrdersSheet(d);
+                    }}
+                    aria-label={`Open orders for ${d.full_name || 'delivery partner'}`}
                   >
-                    <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => { setSelectedDP(d); setOpenDetail(true); }}>{d.full_name || 'N/A'}</TableCell>
+                    <TableCell className="font-medium">{d.full_name || 'N/A'}</TableCell>
                     <TableCell>{d.email || 'N/A'}</TableCell>
                     <TableCell>{d.phone_number || 'N/A'}</TableCell>
                     <TableCell className="capitalize">{d.vehicle_type || 'N/A'}</TableCell>
                     <TableCell>
-                      <Select value={d.status || 'pending'} onValueChange={(value) => handleStatusChange(d.user_id, value)}>
-                        <SelectTrigger className="w-[130px] h-8">
-                          <SelectValue />
-                        </SelectTrigger>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <Select value={d.status || 'pending'} onValueChange={(value) => handleStatusChange(d.user_id, value)}>
+                          <SelectTrigger className="w-[130px] h-8">
+                            <SelectValue />
+                          </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="pending">
                             <div className="flex items-center gap-2">
@@ -444,12 +550,23 @@ export function DeliveryPartners() {
                             </div>
                           </SelectItem>
                         </SelectContent>
-                      </Select>
+                        </Select>
+                      </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={d.is_online ? "default" : "secondary"}>
-                        {d.is_online ? "Online" : "Offline"}
-                      </Badge>
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        {togglingOnline === d.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Switch
+                            checked={d.is_online || false}
+                            onCheckedChange={(checked) => handleOnlineStatusToggle(d, checked)}
+                          />
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {d.is_online ? "Online" : "Offline"}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge variant={d.documents_verified ? "default" : "secondary"}>
@@ -457,12 +574,22 @@ export function DeliveryPartners() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex gap-2 justify-end">
+                      <div className="flex gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => { setSelectedDP(d); setOpenDetail(true); }}
+                          className="h-8 w-8 p-0"
+                          title="View details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button 
                           variant="ghost" 
                           size="sm"
                           onClick={() => openEditDialog(d)}
                           className="h-8 w-8 p-0"
+                          title="Edit"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -471,6 +598,7 @@ export function DeliveryPartners() {
                           size="sm"
                           onClick={() => openDeleteDialog(d)}
                           className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -691,6 +819,134 @@ export function DeliveryPartners() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Orders Sheet */}
+      <Sheet open={!!selectedDPForOrders} onOpenChange={(open: boolean) => !open && setSelectedDPForOrders(null)}>
+        <SheetContent side="right" className="w-full px-2 sm:max-w-xl lg:max-w-2xl xl:max-w-3xl 2xl:max-w-[1200px] overflow-y-auto">
+          {selectedDPForOrders && (
+            <div className="space-y-4">
+              <SheetHeader>
+                <SheetTitle className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Bike className="h-5 w-5" />
+                    Orders for {selectedDPForOrders.full_name || 'Delivery Partner'}
+                  </span>
+                </SheetTitle>
+              </SheetHeader>
+
+              {/* Delivery Partner Info */}
+              <Card className="rounded-xl">
+                <CardHeader className="pb-2"><CardTitle className="text-base">Delivery Partner Info</CardTitle></CardHeader>
+                <CardContent className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Name</div>
+                    <div className="text-sm">{selectedDPForOrders.full_name || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Phone</div>
+                    <div className="text-sm">{selectedDPForOrders.phone_number || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Vehicle</div>
+                    <div className="text-sm capitalize">{selectedDPForOrders.vehicle_type || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Status</div>
+                    <div className="text-sm">
+                      <Badge variant={selectedDPForOrders.is_online ? "default" : "secondary"}>
+                        {selectedDPForOrders.is_online ? "Online" : "Offline"}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Orders List */}
+              <Card className="rounded-xl">
+                <CardHeader className="pb-2"><CardTitle className="text-base">Orders ({dpOrders.length})</CardTitle></CardHeader>
+                <CardContent>
+                  {ordersLoading ? (
+                    <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading orders...
+                    </div>
+                  ) : dpOrders.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">No orders found for this delivery partner</div>
+                  ) : (
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Order ID</TableHead>
+                            <TableHead>Customer</TableHead>
+                            <TableHead>Restaurant</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Created</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {dpOrders.map((order) => (
+                            <TableRow key={order.id}>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  <span>{order.id.substring(0, 8)}</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={async () => {
+                                      try { await navigator.clipboard.writeText(order.id); } catch {}
+                                    }}
+                                    aria-label="Copy order id"
+                                  >
+                                    <Copy className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <User2 className="h-4 w-4" />
+                                  <div className="truncate">
+                                    <div className="font-medium truncate max-w-[180px]">{order.customer_name || "N/A"}</div>
+                                    <a
+                                      href={order.customer_phone ? `tel:${order.customer_phone}` : undefined}
+                                      className={cn("text-xs text-muted-foreground", !order.customer_phone && "pointer-events-none")}
+                                    >
+                                      {order.customer_phone || "-"}
+                                    </a>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="truncate max-w-[220px]">{order.restaurant_name || "N/A"}</div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <IndianRupee className="h-3 w-3" />
+                                  {Number(order.total_payment_amount || 0).toFixed(2)}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={statusVariant(order.order_status)} className="capitalize">
+                                  {order.order_status.replaceAll("_", " ")}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-sm">{timeAgo(order.created_at)}</div>
+                                <div className="text-xs text-muted-foreground">{formatDateTime(order.created_at)}</div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

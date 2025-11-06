@@ -41,6 +41,7 @@ export type Order = {
     | "placed"
     | "pending"
     | "confirmed"
+    | "ready_for_pickup"
     | "out_for_delivery"
     | "delivered"
     | "cancelled"
@@ -113,6 +114,7 @@ const statusVariant = (s: Order["order_status"]) => {
     case "refunded":
       return "destructive" as const;
     case "out_for_delivery":
+    case "ready_for_pickup":
     case "confirmed":
     case "placed":
       return "secondary" as const;
@@ -191,9 +193,16 @@ export function Orders() {
       setDpLoading(true);
       setDpError(null);
       try {
-        const list = await adminApi.getAllDeliveryPartners();
+        const rawData = await adminApi.getAllDeliveryPartners(undefined, 'true');
         if (!alive) return;
-        setDpList(list as DeliveryPartner[]);
+
+        const normalized: DeliveryPartner[] = (rawData ?? []).map((d: any) => ({
+          id: d.id,
+          fullName: d.full_name ?? d.fullName ?? null,
+          phoneNumber: d.phone_number ?? d.phoneNumber ?? null,
+        }));
+
+        setDpList(normalized);
       } catch (e: any) {
         if (!alive) return;
         setDpError("Failed to load delivery partners");
@@ -481,10 +490,7 @@ export function Orders() {
             <div className="space-y-4">
               <SheetHeader>
                 <SheetTitle className="flex items-center justify-between gap-2">
-                  <span>Order {selected.id.substring(0, 8)}</span>
-                  <Badge variant={statusVariant(selected.order_status)} className="capitalize">
-                    {selected.order_status.replaceAll("_", " ")}
-                  </Badge>
+                  <span>Order #{selected.id}</span>
                 </SheetTitle>
               </SheetHeader>
 
