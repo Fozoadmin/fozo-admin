@@ -284,6 +284,13 @@ export const adminApi = {
         }),
       }
     ),
-  
+
+  // Settings Management
+  getSettings: () => apiRequest<Record<string, string>>('/admin/settings'),
+  updateSettings: (settingsData: Record<string, string>) =>
+    apiRequest<{ message: string; updated: any[] }>('/admin/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settingsData),
+    }),
 };
 

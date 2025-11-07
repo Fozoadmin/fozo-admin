@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { adminApi } from "@/lib/api";
+import { subscribeToEvent, SOCKET_EVENTS } from "@/lib/socket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -182,6 +183,30 @@ export function Orders() {
     })();
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  // Listen for new orders via socket
+  useEffect(() => {
+    const unsubscribe = subscribeToEvent<Order>(SOCKET_EVENTS.NEW_ORDER, (newOrder: Order) => {
+      console.log('Socket: Received new_order event', newOrder);
+      // Refetch all orders to ensure we have the latest data
+      adminApi.getAllOrders()
+        .then((data) => {
+          const sorted = [...(data?.orders ?? [])].sort(
+            (a: Order, b: Order) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+          setOrders(sorted as Order[]);
+        })
+        .catch((err) => {
+          console.error('Error refetching orders after socket event:', err);
+        });
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, []);
 
