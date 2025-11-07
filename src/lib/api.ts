@@ -138,7 +138,7 @@ export const adminApi = {
       isClosed: boolean;
     }>;
     restaurantCuisineIds: number[];
-  }) => apiRequest<{ message: string; restaurant_id: string; status: string }>(
+  }) => apiRequest<{ message: string; restaurantId: string; status: string }>(
     '/admin/restaurants',
     { method: 'POST', body: JSON.stringify(body) }
   ),
@@ -165,7 +165,7 @@ export const adminApi = {
       accountHolderName: string;
       bankName: string;
     };
-  }) => apiRequest<{ message: string; user_id: string; status: string }>(
+  }) => apiRequest<{ message: string; userId: string; status: string }>(
     '/admin/delivery-partners',
     { method: 'POST', body: JSON.stringify(body) }
   ),

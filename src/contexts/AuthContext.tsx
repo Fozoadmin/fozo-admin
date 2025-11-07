@@ -3,13 +3,13 @@ import type { ReactNode } from 'react';
 
 interface User {
   id: string;
-  full_name: string;
+  fullName: string;
   email: string;
-  phone_number: string;
-  user_type: string;
-  is_verified: boolean;
-  is_active: boolean;
-  created_at: string;
+  phoneNumber: string;
+  userType: string;
+  isVerified: boolean;
+  isActive: boolean;
+  createdAt: string;
 }
 
 interface AuthContextType {

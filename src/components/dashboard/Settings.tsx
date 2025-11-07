@@ -123,7 +123,7 @@ export function Settings() {
                 <div className="space-y-3">
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-                    <div className="text-sm mt-1">{user?.full_name || '—'}</div>
+                    <div className="text-sm mt-1">{user?.fullName || '—'}</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Email</label>
@@ -131,7 +131,7 @@ export function Settings() {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Phone Number</label>
-                    <div className="text-sm mt-1">{user?.phone_number || '—'}</div>
+                    <div className="text-sm mt-1">{user?.phoneNumber || '—'}</div>
                   </div>
                 </div>
                 <div className="space-y-3">
@@ -139,23 +139,23 @@ export function Settings() {
                     <label className="text-sm font-medium text-muted-foreground">User Type</label>
                     <div className="text-sm mt-1">
                       <Badge variant="default" className="bg-blue-100 text-blue-800 border-blue-200">
-                        {user?.user_type || '—'}
+                        {user?.userType || '—'}
                       </Badge>
                     </div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Account Status</label>
                     <div className="text-sm mt-1">
-                      <Badge variant={user?.is_active ? "default" : "destructive"}>
-                        {user?.is_verified ? "Active" : "Inactive"}
+                      <Badge variant={user?.isActive ? "default" : "destructive"}>
+                        {user?.isVerified ? "Active" : "Inactive"}
                       </Badge>
                     </div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Verification Status</label>
                     <div className="text-sm mt-1">
-                      <Badge variant={user?.is_verified ? "default" : "secondary"}>
-                        {user?.is_verified ? "Verified" : "Unverified"}
+                      <Badge variant={user?.isVerified ? "default" : "secondary"}>
+                        {user?.isVerified ? "Verified" : "Unverified"}
                       </Badge>
                     </div>
                   </div>
