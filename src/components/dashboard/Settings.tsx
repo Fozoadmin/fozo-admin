@@ -42,6 +42,7 @@ interface SettingsData extends Record<string, string> {
 export function Settings() {
   const { user } = useAuth();
   const [settings, setSettings] = useState<SettingsData | null>(null);
+  const [originalSettings, setOriginalSettings] = useState<SettingsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +57,10 @@ export function Settings() {
       setLoading(true);
       setError(null);
       const data = await adminApi.getSettings();
-      setSettings(data as unknown as SettingsData);
+      const settingsData = data as unknown as SettingsData;
+      setSettings(settingsData);
+      // Store original settings for comparison
+      setOriginalSettings({ ...settingsData });
     } catch (err: any) {
       setError(err.message || 'Failed to load settings');
     } finally {
@@ -65,15 +69,47 @@ export function Settings() {
   };
 
   const handleSave = async () => {
-    if (!settings) return;
+    if (!settings || !originalSettings) return;
     
     try {
       setSaving(true);
       setError(null);
       setSuccess(null);
       
-      await adminApi.updateSettings(settings);
-      setSuccess('Settings updated successfully!');
+      // Compare current settings with original to find only changed values
+      const changedSettings: Record<string, string> = {};
+      for (const key in settings) {
+        if (settings.hasOwnProperty(key) && originalSettings.hasOwnProperty(key)) {
+          const currentValue = settings[key];
+          const originalValue = originalSettings[key];
+          // Only include if value has changed
+          if (currentValue !== originalValue) {
+            changedSettings[key] = currentValue;
+          }
+        }
+      }
+      
+      // If nothing changed, show message and return early
+      if (Object.keys(changedSettings).length === 0) {
+        setSuccess('No changes detected. Settings are already up to date.');
+        setTimeout(() => setSuccess(null), 3000);
+        setSaving(false);
+        return;
+      }
+      
+      // Only send changed settings to the backend
+      const result = await adminApi.updateSettings(changedSettings);
+      
+      // Update original settings to reflect the saved state
+      const updatedOriginal: SettingsData = { ...originalSettings };
+      for (const key in changedSettings) {
+        updatedOriginal[key as keyof SettingsData] = changedSettings[key];
+      }
+      setOriginalSettings(updatedOriginal);
+      
+      // Show success message with number of changed settings
+      const changedCount = result.changedKeys?.length || Object.keys(changedSettings).length;
+      setSuccess(`Successfully updated ${changedCount} setting(s)!`);
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
@@ -473,7 +509,15 @@ export function Settings() {
           <div className="flex justify-end gap-2 pt-4">
             <Button
               variant="outline"
-              onClick={loadSettings}
+              onClick={() => {
+                if (originalSettings) {
+                  setSettings({ ...originalSettings });
+                  setError(null);
+                  setSuccess(null);
+                } else {
+                  loadSettings();
+                }
+              }}
               disabled={saving}
             >
               Reset
