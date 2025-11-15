@@ -7,7 +7,7 @@ import { io, Socket } from 'socket.io-client';
 export const SOCKET_EVENTS = {
   NEW_ORDER: 'new_order',
   SETTINGS_UPDATED: 'settings_updated',
-  ORDER_UPDATE: 'order_update',
+  ORDER_UPDATED: 'order_updated',
 } as const;
 
 type SocketEventType = typeof SOCKET_EVENTS[keyof typeof SOCKET_EVENTS];

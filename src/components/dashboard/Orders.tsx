@@ -21,6 +21,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Copy, ExternalLink, Loader2, MapPin, Phone, User2, Truck, IndianRupee, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ORDER_STATUS, getStatusLabel } from "@/constants/orderStatus";
+import type { OrderStatus } from "@/constants/orderStatus";
 
 // ------------------ Types ------------------
 export type Order = {
@@ -38,15 +40,7 @@ export type Order = {
   customerPhoneSnapshot: string;
   customerEmailSnapshot: string | null;
   notesToRestaurant: string | null;
-  orderStatus:
-    | "placed"
-    | "pending"
-    | "confirmed"
-    | "ready_for_pickup"
-    | "out_for_delivery"
-    | "delivered"
-    | "cancelled"
-    | "refunded";
+  orderStatus: OrderStatus;
   paymentStatus: "paid" | "pending" | "failed";
   paymentTransactionId: string | null;
   paymentMethod: string | null;
@@ -109,30 +103,34 @@ const formatDateTime = (iso?: string | null) => {
 
 const statusVariant = (s: Order["orderStatus"]) => {
   switch (s) {
-    case "delivered":
+    case ORDER_STATUS.DELIVERED:
       return "default" as const;
-    case "cancelled":
-    case "refunded":
+    case ORDER_STATUS.CANCELLED_BY_USER:
+    case ORDER_STATUS.CANCELLED_BY_RESTAURANT:
+    case ORDER_STATUS.CANCELLED_BY_ADMIN:
+    case ORDER_STATUS.REFUNDED:
       return "destructive" as const;
-    case "out_for_delivery":
-    case "ready_for_pickup":
-    case "confirmed":
-    case "placed":
+    case ORDER_STATUS.OUT_FOR_DELIVERY:
+    case ORDER_STATUS.READY_FOR_PICKUP:
+    case ORDER_STATUS.CONFIRMED:
+    case ORDER_STATUS.PLACED:
       return "secondary" as const;
     default:
       return "outline" as const;
   }
 };
 
-const STATUS_OPTIONS: Array<Order["orderStatus"] | "all"> = [
+const STATUS_OPTIONS: Array<OrderStatus | "all"> = [
   "all",
-  "placed",
-  "pending",
-  "confirmed",
-  "out_for_delivery",
-  "delivered",
-  "cancelled",
-  "refunded",
+  ORDER_STATUS.PLACED,
+  ORDER_STATUS.CONFIRMED,
+  ORDER_STATUS.READY_FOR_PICKUP,
+  ORDER_STATUS.OUT_FOR_DELIVERY,
+  ORDER_STATUS.DELIVERED,
+  ORDER_STATUS.CANCELLED_BY_USER,
+  ORDER_STATUS.CANCELLED_BY_RESTAURANT,
+  ORDER_STATUS.CANCELLED_BY_ADMIN,
+  ORDER_STATUS.REFUNDED,
 ];
 
 function useDebounced<T>(value: T, delay = 300) {
@@ -290,9 +288,9 @@ export function Orders() {
   // --- Status update handler ---
   const handleStatusChange = async (
     order: Order,
-    newStatus: Order["orderStatus"]
+    newStatus: OrderStatus
   ) => {
-    if (newStatus === "out_for_delivery") {
+    if (newStatus === ORDER_STATUS.OUT_FOR_DELIVERY) {
       // Open assignment dialog; require a DP selection for admins per backend
       setPendingOutForDeliveryOrder(order);
       setDpSelectedId(order.deliveryPartnerId || "");
@@ -328,7 +326,7 @@ export function Orders() {
           o.id === pendingOutForDeliveryOrder.id
             ? {
                 ...o,
-                orderStatus: "out_for_delivery",
+                orderStatus: ORDER_STATUS.OUT_FOR_DELIVERY,
                 deliveryPartnerId: dpSelectedId,
                 deliveryPartnerName: chosen?.fullName || o.deliveryPartnerName || null,
                 deliveryPartnerPhone: chosen?.phoneNumber || o.deliveryPartnerPhone || null,
@@ -336,12 +334,12 @@ export function Orders() {
             : o
         )
       );
-      await adminApi.updateOrderStatus(pendingOutForDeliveryOrder.id, "out_for_delivery", dpSelectedId);
+      await adminApi.updateOrderStatus(pendingOutForDeliveryOrder.id, ORDER_STATUS.OUT_FOR_DELIVERY, dpSelectedId);
       setSelected((sel) =>
         sel && sel.id === pendingOutForDeliveryOrder.id
           ? {
               ...sel,
-              orderStatus: "out_for_delivery",
+              orderStatus: ORDER_STATUS.OUT_FOR_DELIVERY,
               deliveryPartnerId: dpSelectedId,
               deliveryPartnerName: chosen?.fullName || sel.deliveryPartnerName,
               deliveryPartnerPhone: chosen?.phoneNumber || sel.deliveryPartnerPhone,
@@ -371,12 +369,12 @@ export function Orders() {
               placeholder="Search by ID, customer, restaurant, phone"
               aria-label="Search orders"
             />
-            <Select value={status} onValueChange={(v) => setStatus(v as any)}>
+              <Select value={status} onValueChange={(v) => setStatus(v as any)}>
               <SelectTrigger className="w-[220px]"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 {STATUS_OPTIONS.map((s) => (
                   <SelectItem key={s} value={s}>
-                    {s === "all" ? "All Statuses" : s.replaceAll("_", " ")}
+                    {s === "all" ? "All Statuses" : getStatusLabel(s)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -395,7 +393,7 @@ export function Orders() {
             </div>
             <div className="rounded-xl border p-3 text-center">
               <div className="text-xs text-muted-foreground">Delivered</div>
-              <div className="text-lg font-semibold">{kpis.counts["delivered"] ?? 0}</div>
+              <div className="text-lg font-semibold">{kpis.counts[ORDER_STATUS.DELIVERED] ?? 0}</div>
             </div>
           </div>
         </CardContent>
@@ -491,7 +489,7 @@ export function Orders() {
                       </TableCell>
                       <TableCell>
                         <Badge variant={statusVariant(o.orderStatus)} className="capitalize">
-                          {o.orderStatus.replaceAll("_", " ")}
+                          {getStatusLabel(o.orderStatus)}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -523,13 +521,13 @@ export function Orders() {
               <div className="flex flex-wrap items-center gap-2">
                 <Select
                   value={selected.orderStatus}
-                  onValueChange={(v) => handleStatusChange(selected, v as Order["orderStatus"])}
+                  onValueChange={(v) => handleStatusChange(selected, v as OrderStatus)}
                 >
                   <SelectTrigger className="w-[240px]"><SelectValue placeholder="Update status" /></SelectTrigger>
                   <SelectContent>
                     {STATUS_OPTIONS.filter((s) => s !== "all").map((s) => (
                       <SelectItem key={s} value={s} className="capitalize">
-                        {s.replaceAll("_", " ")}
+                        {getStatusLabel(s)}
                       </SelectItem>
                     ))}
                   </SelectContent>

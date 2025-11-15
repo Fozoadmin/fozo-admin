@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Plus, Bike, Trash2, Edit, CheckCircle2, XCircle, Ban, Loader2, Copy, User2, IndianRupee, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ORDER_STATUS } from "@/constants/orderStatus";
 
 export function DeliveryPartners() {
   const [deliveryPartners, setDeliveryPartners] = useState<any[]>([]);
@@ -338,15 +339,17 @@ export function DeliveryPartners() {
 
   const statusVariant = (s: string) => {
     switch (s) {
-      case "delivered":
+      case ORDER_STATUS.DELIVERED:
         return "default" as const;
-      case "cancelled":
-      case "refunded":
+      case ORDER_STATUS.CANCELLED_BY_USER:
+      case ORDER_STATUS.CANCELLED_BY_RESTAURANT:
+      case ORDER_STATUS.CANCELLED_BY_ADMIN:
+      case ORDER_STATUS.REFUNDED:
         return "destructive" as const;
-      case "out_for_delivery":
-      case "ready_for_pickup":
-      case "confirmed":
-      case "placed":
+      case ORDER_STATUS.OUT_FOR_DELIVERY:
+      case ORDER_STATUS.READY_FOR_PICKUP:
+      case ORDER_STATUS.CONFIRMED:
+      case ORDER_STATUS.PLACED:
         return "secondary" as const;
       default:
         return "outline" as const;

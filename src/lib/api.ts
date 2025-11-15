@@ -1,15 +1,9 @@
+import type { OrderStatus } from '../constants/orderStatus';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const API_KEY = import.meta.env.VITE_API_KEY || '';
 
-type AdminOrderStatus =
-  | 'placed'
-  | 'pending'
-  | 'confirmed'
-  | 'ready_for_pickup'
-  | 'out_for_delivery'
-  | 'delivered'
-  | 'cancelled'
-  | 'refunded';
+type AdminOrderStatus = OrderStatus;
 
 
 interface RequestOptions extends RequestInit {
