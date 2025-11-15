@@ -147,7 +147,7 @@ export function SurpriseBags() {
       }
 
       await adminApi.createSurpriseBag({
-        targetRestaurantId: selectedRestaurant.restaurant_id || selectedRestaurant.id,
+        targetRestaurantId: selectedRestaurant.restaurantId || selectedRestaurant.id,
         bagName: formB.bagName,
         denominationValue: parseFloat(formB.denominationValue),
         actualWorth: parseFloat(formB.actualWorth),
@@ -195,8 +195,8 @@ export function SurpriseBags() {
                   {selectedRestaurant ? (
                     <div className="flex items-center justify-between p-3 border rounded-lg bg-green-50 border-green-200">
                       <div>
-                        <div className="font-medium">{selectedRestaurant.restaurant_name}</div>
-                        <div className="text-sm text-muted-foreground">{selectedRestaurant.user_email || selectedRestaurant.phone_number}</div>
+                        <div className="font-medium">{selectedRestaurant.restaurantName}</div>
+                        <div className="text-sm text-muted-foreground">{selectedRestaurant.userEmail || selectedRestaurant.phoneNumber}</div>
                       </div>
                       <Button size="sm" variant="ghost" onClick={clearSelectedRestaurant}>
                         <X className="h-4 w-4" />
@@ -220,13 +220,13 @@ export function SurpriseBags() {
                         <div className="border rounded-lg max-h-48 overflow-y-auto">
                           {searchResults.map((restaurant) => (
                             <div
-                              key={restaurant.restaurant_id}
+                              key={restaurant.restaurantId}
                               className="p-3 hover:bg-muted cursor-pointer border-b last:border-b-0"
                               onClick={() => selectRestaurant(restaurant)}
                             >
-                              <div className="font-medium">{restaurant.restaurant_name}</div>
+                              <div className="font-medium">{restaurant.restaurantName}</div>
                               <div className="text-sm text-muted-foreground">
-                                {restaurant.user_email || restaurant.phone_number}
+                                {restaurant.userEmail || restaurant.phoneNumber}
                               </div>
                             </div>
                           ))}
@@ -379,34 +379,34 @@ export function SurpriseBags() {
           ) : (
             <div className="space-y-2">
               {groupedRestaurants.map((restaurant) => (
-                <div key={restaurant.restaurant_id} className="border rounded-lg overflow-hidden">
+                <div key={restaurant.restaurantId} className="border rounded-lg overflow-hidden">
                   {/* Restaurant Header - Clickable to expand/collapse */}
                   <div
                     className="flex items-center justify-between p-4 bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors"
-                    onClick={() => toggleRestaurant(restaurant.restaurant_id)}
+                    onClick={() => toggleRestaurant(restaurant.restaurantId)}
                   >
                     <div className="flex items-center gap-3">
                       <button className="p-1 hover:bg-muted rounded">
-                        {expandedRestaurants.has(restaurant.restaurant_id) ? (
+                        {expandedRestaurants.has(restaurant.restaurantId) ? (
                           <ChevronDown className="h-5 w-5" />
                         ) : (
                           <ChevronRight className="h-5 w-5" />
                         )}
                       </button>
                       <div>
-                        <h3 className="font-semibold text-lg">{restaurant.restaurant_name}</h3>
+                        <h3 className="font-semibold text-lg">{restaurant.restaurantName}</h3>
                         <p className="text-sm text-muted-foreground">
-                          {restaurant.restaurant_owner_phone} • {restaurant.total_bags} bag{restaurant.total_bags !== 1 ? 's' : ''}
+                          {restaurant.restaurantOwnerPhone} • {restaurant.totalBags} bag{restaurant.totalBags !== 1 ? 's' : ''}
                         </p>
                       </div>
                     </div>
                     <Badge variant="outline" className="text-sm">
-                      {restaurant.total_bags} Active Listing{restaurant.total_bags !== 1 ? 's' : ''}
+                      {restaurant.totalBags} Active Listing{restaurant.totalBags !== 1 ? 's' : ''}
                     </Badge>
                   </div>
 
                   {/* Expanded Bags Table */}
-                  {expandedRestaurants.has(restaurant.restaurant_id) && (
+                  {expandedRestaurants.has(restaurant.restaurantId) && (
                     <div className="border-t">
                       <Table>
                         <TableHeader>
@@ -422,21 +422,21 @@ export function SurpriseBags() {
                         </TableHeader>
                         <TableBody>
                           {restaurant.bags.map((bag: any) => (
-                            <TableRow key={bag.bag_id} className="hover:bg-muted/30 font-light">
-                              <TableCell className="font-light">{bag.bag_name || 'N/A'}</TableCell>
-                              <TableCell>₹{Number(bag.denomination_value || 0).toFixed(2)}</TableCell>
-                              <TableCell>₹{Number(bag.actual_worth || 0).toFixed(2)}</TableCell>
-                              <TableCell>{bag.quantity_available || 0}</TableCell>
+                            <TableRow key={bag.bagId} className="hover:bg-muted/30 font-light">
+                              <TableCell className="font-light">{bag.bagName || 'N/A'}</TableCell>
+                              <TableCell>₹{Number(bag.denominationValue || 0).toFixed(2)}</TableCell>
+                              <TableCell>₹{Number(bag.actualWorth || 0).toFixed(2)}</TableCell>
+                              <TableCell>{bag.quantityAvailable || 0}</TableCell>
                               <TableCell className="text-sm">
-                                {bag.pickup_time || 'N/A'}
+                                {bag.pickupTime || 'N/A'}
                               </TableCell>
                               <TableCell>
-                                <Badge variant={bag.is_active ? "default" : "secondary"}>
-                                  {bag.is_active ? "Active" : "Inactive"}
+                                <Badge variant={bag.isActive ? "default" : "secondary"}>
+                                  {bag.isActive ? "Active" : "Inactive"}
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                {bag.available_date ? new Date(bag.available_date).toLocaleDateString() : 'N/A'}
+                                {bag.availableDate ? new Date(bag.availableDate).toLocaleDateString() : 'N/A'}
                               </TableCell>
                             </TableRow>
                           ))}

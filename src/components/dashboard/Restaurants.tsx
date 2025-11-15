@@ -313,43 +313,43 @@ export function Restaurants() {
   const openEditDialog = async (restaurant: any) => {
     try {
       // Fetch full restaurant details including location and operating hours
-      const fullDetails = await adminApi.getRestaurantById(restaurant.restaurant_id);
+      const fullDetails = await adminApi.getRestaurantById(restaurant.restaurantId);
       setSelectedRestaurant(fullDetails);
       
       // Pre-fill form with existing data
       setFormR({
-        fullName: fullDetails.user_full_name || "",
-        email: fullDetails.user_email || "",
-        phoneNumber: fullDetails.phone_number?.replace('+91', '') || "",
+        fullName: fullDetails.userFullName || "",
+        email: fullDetails.userEmail || "",
+        phoneNumber: fullDetails.phoneNumber?.replace('+91', '') || "",
         password: "", // Don't pre-fill password
-        restaurantName: fullDetails.restaurant_name || "",
-        contactPersonName: fullDetails.contact_person_name || "",
-        fssaiLicenseNumber: fullDetails.fssai_license_number || "",
-        gstinNumber: fullDetails.gstin_number || ""
+        restaurantName: fullDetails.restaurantName || "",
+        contactPersonName: fullDetails.contactPersonName || "",
+        fssaiLicenseNumber: fullDetails.fssaiLicenseNumber || "",
+        gstinNumber: fullDetails.gstinNumber || ""
       });
       
       // Pre-fill location
-      if (fullDetails.primary_location) {
+      if (fullDetails.primaryLocation) {
         setLocation({
-          locationName: fullDetails.primary_location.location_name || "",
-          address: fullDetails.primary_location.address || "",
-          latitude: fullDetails.primary_location.latitude?.toString() || "",
-          longitude: fullDetails.primary_location.longitude?.toString() || "",
-          contactNumber: fullDetails.primary_location.contact_number?.replace('+91', '') || "",
-          email: fullDetails.primary_location.email || ""
+          locationName: fullDetails.primaryLocation.locationName || "",
+          address: fullDetails.primaryLocation.address || "",
+          latitude: fullDetails.primaryLocation.latitude?.toString() || "",
+          longitude: fullDetails.primaryLocation.longitude?.toString() || "",
+          contactNumber: fullDetails.primaryLocation.contactNumber?.replace('+91', '') || "",
+          email: fullDetails.primaryLocation.email || ""
         });
       }
       
       // Pre-fill operating hours
-      if (fullDetails.operating_hours) {
+      if (fullDetails.operatingHours) {
         const hours: Record<string, {open: string, close: string, isClosed: boolean}> = {};
         DAYS_OF_WEEK.forEach(day => {
-          const dayData = fullDetails.operating_hours[day];
+          const dayData = fullDetails.operatingHours[day];
           if (dayData) {
             hours[day] = {
-              open: dayData.open_time?.substring(0, 5) || "09:00",
-              close: dayData.close_time?.substring(0, 5) || "22:00",
-              isClosed: dayData.is_closed || false
+              open: dayData.openTime?.substring(0, 5) || "09:00",
+              close: dayData.closeTime?.substring(0, 5) || "22:00",
+              isClosed: dayData.isClosed || false
             };
           } else {
             hours[day] = { open: "09:00", close: "22:00", isClosed: false };
@@ -359,12 +359,12 @@ export function Restaurants() {
       }
       
       // Pre-fill bank details
-      if (fullDetails.bank_account_details) {
+      if (fullDetails.bankAccountDetails) {
         setBankDetails({
-          accountNumber: fullDetails.bank_account_details.accountNumber || "",
-          ifscCode: fullDetails.bank_account_details.ifscCode || "",
-          accountHolderName: fullDetails.bank_account_details.accountHolderName || "",
-          bankName: fullDetails.bank_account_details.bankName || ""
+          accountNumber: fullDetails.bankAccountDetails.accountNumber || "",
+          ifscCode: fullDetails.bankAccountDetails.ifscCode || "",
+          accountHolderName: fullDetails.bankAccountDetails.accountHolderName || "",
+          bankName: fullDetails.bankAccountDetails.bankName || ""
         });
       }
       
@@ -400,14 +400,14 @@ export function Restaurants() {
       
       // Build operating hours array
       const hoursArray = DAYS_OF_WEEK.map(day => ({
-        day_of_week: day,
-        open_time: operatingHours[day].isClosed ? null : operatingHours[day].open + ':00',
-        close_time: operatingHours[day].isClosed ? null : operatingHours[day].close + ':00',
-        is_closed: operatingHours[day].isClosed
+        dayOfWeek: day,
+        openTime: operatingHours[day].isClosed ? null : operatingHours[day].open + ':00',
+        closeTime: operatingHours[day].isClosed ? null : operatingHours[day].close + ':00',
+        isClosed: operatingHours[day].isClosed
       }));
       
       // Update restaurant profile (basic info, location, hours, bank)
-      await adminApi.updateRestaurantProfile(selectedRestaurant.restaurant_id, {
+      await adminApi.updateRestaurantProfile(selectedRestaurant.restaurantId, {
         restaurantName: formR.restaurantName,
         contactPersonName: formR.contactPersonName,
         fssaiLicenseNumber: formR.fssaiLicenseNumber || undefined,
@@ -425,7 +425,7 @@ export function Restaurants() {
       });
       
       // Update cuisines
-      await adminApi.updateRestaurantCuisines(selectedRestaurant.restaurant_id, selectedCuisineIds);
+      await adminApi.updateRestaurantCuisines(selectedRestaurant.restaurantId, selectedCuisineIds);
       
       // Refresh list
       const updatedRestaurants = await adminApi.getAllRestaurants();
@@ -451,7 +451,7 @@ export function Restaurants() {
     
     try {
       setDeleting(true);
-      await adminApi.deleteRestaurant(selectedRestaurant.restaurant_id);
+      await adminApi.deleteRestaurant(selectedRestaurant.restaurantId);
       
       // Refresh list
       const updatedRestaurants = await adminApi.getAllRestaurants();
@@ -766,14 +766,14 @@ export function Restaurants() {
               <TableBody>
                 {restaurants.map((r) => (
                   <TableRow 
-                    key={r.restaurant_id}
+                    key={r.restaurantId}
                   >
-                    <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => openRestaurantDetail(r)}>{r.restaurant_name || 'N/A'}</TableCell>
-                    <TableCell>{r.contact_person_name || 'N/A'}</TableCell>
-                    <TableCell>{r.user_email || 'N/A'}</TableCell>
-                    <TableCell>{r.phone_number || 'N/A'}</TableCell>
+                    <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => openRestaurantDetail(r)}>{r.restaurantName || 'N/A'}</TableCell>
+                    <TableCell>{r.contactPersonName || 'N/A'}</TableCell>
+                    <TableCell>{r.userEmail || 'N/A'}</TableCell>
+                    <TableCell>{r.phoneNumber || 'N/A'}</TableCell>
                     <TableCell>
-                      <Select value={r.status || 'pending'} onValueChange={(value) => handleStatusChange(r.restaurant_id, value)}>
+                      <Select value={r.status || 'pending'} onValueChange={(value) => handleStatusChange(r.restaurantId, value)}>
                         <SelectTrigger className="w-[130px] h-8">
                           <SelectValue />
                         </SelectTrigger>
@@ -805,10 +805,10 @@ export function Restaurants() {
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell>{r.average_rating || 'N/A'}</TableCell>
+                    <TableCell>{r.averageRating || 'N/A'}</TableCell>
                     <TableCell>
-                      <Badge variant={r.documents_verified ? "default" : "secondary"}>
-                        {r.documents_verified ? "Yes" : "No"}
+                      <Badge variant={r.documentsVerified ? "default" : "secondary"}>
+                        {r.documentsVerified ? "Yes" : "No"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -856,27 +856,27 @@ export function Restaurants() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Restaurant Name</label>
-                    <div className="text-sm mt-1">{selectedRestaurant.restaurant_name || '—'}</div>
+                    <div className="text-sm mt-1">{selectedRestaurant.restaurantName || '—'}</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Contact Person</label>
-                    <div className="text-sm mt-1">{selectedRestaurant.contact_person_name || '—'}</div>
+                    <div className="text-sm mt-1">{selectedRestaurant.contactPersonName || '—'}</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Email</label>
-                    <div className="text-sm mt-1">{selectedRestaurant.user_email || '—'}</div>
+                    <div className="text-sm mt-1">{selectedRestaurant.userEmail || '—'}</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Phone</label>
-                    <div className="text-sm mt-1">{selectedRestaurant.phone_number || '—'}</div>
+                    <div className="text-sm mt-1">{selectedRestaurant.phoneNumber || '—'}</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">FSSAI License</label>
-                    <div className="text-sm mt-1">{selectedRestaurant.fssai_license_number || '—'}</div>
+                    <div className="text-sm mt-1">{selectedRestaurant.fssaiLicenseNumber || '—'}</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">GSTIN</label>
-                    <div className="text-sm mt-1">{selectedRestaurant.gstin_number || '—'}</div>
+                    <div className="text-sm mt-1">{selectedRestaurant.gstinNumber || '—'}</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Status</label>
@@ -892,20 +892,20 @@ export function Restaurants() {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Average Rating</label>
-                    <div className="text-sm mt-1">{selectedRestaurant.average_rating || '0.0'} ⭐</div>
+                    <div className="text-sm mt-1">{selectedRestaurant.averageRating || '0.0'} ⭐</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Documents Verified</label>
                     <div className="text-sm mt-1">
-                      <Badge variant={selectedRestaurant.documents_verified ? "default" : "secondary"}>
-                        {selectedRestaurant.documents_verified ? "Yes" : "No"}
+                      <Badge variant={selectedRestaurant.documentsVerified ? "default" : "secondary"}>
+                        {selectedRestaurant.documentsVerified ? "Yes" : "No"}
                       </Badge>
                     </div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Created At</label>
                     <div className="text-sm mt-1">
-                      {selectedRestaurant.created_at ? new Date(selectedRestaurant.created_at).toLocaleString() : '—'}
+                      {selectedRestaurant.createdAt ? new Date(selectedRestaurant.createdAt).toLocaleString() : '—'}
                     </div>
                   </div>
                 </div>
@@ -931,11 +931,11 @@ export function Restaurants() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Restaurant ID</label>
-                    <div className="text-xs mt-1 font-mono">{selectedRestaurant.restaurant_id}</div>
+                    <div className="text-xs mt-1 font-mono">{selectedRestaurant.restaurantId}</div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">User ID</label>
-                    <div className="text-xs mt-1 font-mono">{selectedRestaurant.user_id}</div>
+                    <div className="text-xs mt-1 font-mono">{selectedRestaurant.userId}</div>
                   </div>
                 </div>
               </div>
@@ -953,7 +953,7 @@ export function Restaurants() {
           <DialogHeader>
             <DialogTitle>Edit Restaurant</DialogTitle>
             <DialogDescription>
-              Update details for {selectedRestaurant?.restaurant_name}
+              Update details for {selectedRestaurant?.restaurantName}
             </DialogDescription>
           </DialogHeader>
           
@@ -1164,7 +1164,7 @@ export function Restaurants() {
           <DialogHeader>
             <DialogTitle>Confirm Deletion</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete <strong>{selectedRestaurant?.restaurant_name}</strong>?
+              Are you sure you want to delete <strong>{selectedRestaurant?.restaurantName}</strong>?
             </DialogDescription>
           </DialogHeader>
           <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">

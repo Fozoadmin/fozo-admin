@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { Plus, Bike, Trash2, Edit, CheckCircle2, XCircle, Ban, Loader2, Copy, User2, IndianRupee, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ORDER_STATUS } from "@/constants/orderStatus";
 
 export function DeliveryPartners() {
   const [deliveryPartners, setDeliveryPartners] = useState<any[]>([]);
@@ -161,21 +162,21 @@ export function DeliveryPartners() {
     
     // Pre-fill form with existing data
     setFormD({
-      fullName: dp.full_name || "",
+      fullName: dp.fullName || "",
       email: dp.email || "",
-      phoneNumber: dp.phone_number?.replace('+91', '') || "",
+      phoneNumber: dp.phoneNumber?.replace('+91', '') || "",
       password: "", // Don't pre-fill password
-      vehicleType: dp.vehicle_type || "bicycle",
-      licenseNumber: dp.license_number || ""
+      vehicleType: dp.vehicleType || "bicycle",
+      licenseNumber: dp.licenseNumber || ""
     });
     
     // Pre-fill bank details
-    if (dp.bank_account_details) {
+    if (dp.bankAccountDetails) {
       setBankDetails({
-        accountNumber: dp.bank_account_details.accountNumber || "",
-        ifscCode: dp.bank_account_details.ifscCode || "",
-        accountHolderName: dp.bank_account_details.accountHolderName || "",
-        bankName: dp.bank_account_details.bankName || ""
+        accountNumber: dp.bankAccountDetails.accountNumber || "",
+        ifscCode: dp.bankAccountDetails.ifscCode || "",
+        accountHolderName: dp.bankAccountDetails.accountHolderName || "",
+        bankName: dp.bankAccountDetails.bankName || ""
       });
     } else {
       setBankDetails({
@@ -209,7 +210,7 @@ export function DeliveryPartners() {
       } : undefined;
       
       // Update delivery partner
-      await adminApi.updateDeliveryPartner(selectedDP.user_id, {
+      await adminApi.updateDeliveryPartner(selectedDP.userId, {
         fullName: formD.fullName,
         vehicleType: formD.vehicleType,
         licenseNumber: formD.licenseNumber || undefined,
@@ -240,7 +241,7 @@ export function DeliveryPartners() {
     
     try {
       setDeleting(true);
-      await adminApi.deleteUser(selectedDP.user_id);
+      await adminApi.deleteUser(selectedDP.userId);
       
       // Refresh list
       const updatedDPs = await adminApi.getAllDeliveryPartners();
@@ -338,15 +339,17 @@ export function DeliveryPartners() {
 
   const statusVariant = (s: string) => {
     switch (s) {
-      case "delivered":
+      case ORDER_STATUS.DELIVERED:
         return "default" as const;
-      case "cancelled":
-      case "refunded":
+      case ORDER_STATUS.CANCELLED_BY_USER:
+      case ORDER_STATUS.CANCELLED_BY_RESTAURANT:
+      case ORDER_STATUS.CANCELLED_BY_ADMIN:
+      case ORDER_STATUS.REFUNDED:
         return "destructive" as const;
-      case "out_for_delivery":
-      case "ready_for_pickup":
-      case "confirmed":
-      case "placed":
+      case ORDER_STATUS.OUT_FOR_DELIVERY:
+      case ORDER_STATUS.READY_FOR_PICKUP:
+      case ORDER_STATUS.CONFIRMED:
+      case ORDER_STATUS.PLACED:
         return "secondary" as const;
       default:
         return "outline" as const;
@@ -500,22 +503,22 @@ export function DeliveryPartners() {
               <TableBody>
                 {deliveryPartners.map((d) => (
                   <TableRow 
-                    key={d.user_id}
+                    key={d.userId}
                     className="cursor-pointer hover:bg-muted/40"
                     onClick={() => openOrdersSheet(d)}
                     tabIndex={0}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") openOrdersSheet(d);
                     }}
-                    aria-label={`Open orders for ${d.full_name || 'delivery partner'}`}
+                    aria-label={`Open orders for ${d.fullName || 'delivery partner'}`}
                   >
-                    <TableCell className="font-medium">{d.full_name || 'N/A'}</TableCell>
+                    <TableCell className="font-medium">{d.fullName || 'N/A'}</TableCell>
                     <TableCell>{d.email || 'N/A'}</TableCell>
-                    <TableCell>{d.phone_number || 'N/A'}</TableCell>
-                    <TableCell className="capitalize">{d.vehicle_type || 'N/A'}</TableCell>
+                    <TableCell>{d.phoneNumber || 'N/A'}</TableCell>
+                    <TableCell className="capitalize">{d.vehicleType || 'N/A'}</TableCell>
                     <TableCell>
                       <div onClick={(e) => e.stopPropagation()}>
-                        <Select value={d.status || 'pending'} onValueChange={(value) => handleStatusChange(d.user_id, value)}>
+                        <Select value={d.status || 'pending'} onValueChange={(value) => handleStatusChange(d.userId, value)}>
                           <SelectTrigger className="w-[130px] h-8">
                             <SelectValue />
                           </SelectTrigger>
@@ -554,18 +557,18 @@ export function DeliveryPartners() {
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                           <Switch
-                            checked={d.is_online || false}
+                            checked={d.isOnline || false}
                             onCheckedChange={(checked) => handleOnlineStatusToggle(d, checked)}
                           />
                         )}
                         <span className="text-xs text-muted-foreground">
-                          {d.is_online ? "Online" : "Offline"}
+                          {d.isOnline ? "Online" : "Offline"}
                         </span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={d.documents_verified ? "default" : "secondary"}>
-                        {d.documents_verified ? "Yes" : "No"}
+                      <Badge variant={d.documentsVerified ? "default" : "secondary"}>
+                        {d.documentsVerified ? "Yes" : "No"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -621,7 +624,7 @@ export function DeliveryPartners() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-                  <div className="text-sm mt-1">{selectedDP.full_name || '—'}</div>
+                  <div className="text-sm mt-1">{selectedDP.fullName || '—'}</div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Email</label>
@@ -629,15 +632,15 @@ export function DeliveryPartners() {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Phone Number</label>
-                  <div className="text-sm mt-1">{selectedDP.phone_number || '—'}</div>
+                  <div className="text-sm mt-1">{selectedDP.phoneNumber || '—'}</div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Vehicle Type</label>
-                  <div className="text-sm mt-1 capitalize">{selectedDP.vehicle_type || '—'}</div>
+                  <div className="text-sm mt-1 capitalize">{selectedDP.vehicleType || '—'}</div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">License Number</label>
-                  <div className="text-sm mt-1">{selectedDP.license_number || '—'}</div>
+                  <div className="text-sm mt-1">{selectedDP.licenseNumber || '—'}</div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Status</label>
@@ -654,36 +657,36 @@ export function DeliveryPartners() {
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Online Status</label>
                   <div className="text-sm mt-1">
-                    <Badge variant={selectedDP.is_online ? "default" : "secondary"}>
-                      {selectedDP.is_online ? "Online" : "Offline"}
+                    <Badge variant={selectedDP.isOnline ? "default" : "secondary"}>
+                      {selectedDP.isOnline ? "Online" : "Offline"}
                     </Badge>
                   </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Documents Verified</label>
                   <div className="text-sm mt-1">
-                    <Badge variant={selectedDP.documents_verified ? "default" : "secondary"}>
-                      {selectedDP.documents_verified ? "Yes" : "No"}
+                    <Badge variant={selectedDP.documentsVerified ? "default" : "secondary"}>
+                      {selectedDP.documentsVerified ? "Yes" : "No"}
                     </Badge>
                   </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Total Deliveries</label>
-                  <div className="text-sm mt-1">{selectedDP.total_deliveries || 0}</div>
+                  <div className="text-sm mt-1">{selectedDP.totalDeliveries || 0}</div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Average Rating</label>
-                  <div className="text-sm mt-1">{selectedDP.average_rating || '0.0'} ⭐</div>
+                  <div className="text-sm mt-1">{selectedDP.averageRating || '0.0'} ⭐</div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Created At</label>
                   <div className="text-sm mt-1">
-                    {selectedDP.created_at ? new Date(selectedDP.created_at).toLocaleString() : '—'}
+                    {selectedDP.createdAt ? new Date(selectedDP.createdAt).toLocaleString() : '—'}
                   </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">User ID</label>
-                  <div className="text-xs mt-1 font-mono">{selectedDP.user_id}</div>
+                  <div className="text-xs mt-1 font-mono">{selectedDP.userId}</div>
                 </div>
               </div>
             </div>
@@ -700,7 +703,7 @@ export function DeliveryPartners() {
           <DialogHeader>
             <DialogTitle>Edit Delivery Partner</DialogTitle>
             <DialogDescription>
-              Update details for {selectedDP?.full_name}
+              Update details for {selectedDP?.fullName}
             </DialogDescription>
           </DialogHeader>
           
@@ -792,7 +795,7 @@ export function DeliveryPartners() {
           <DialogHeader>
             <DialogTitle>Confirm Deletion</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete <strong>{selectedDP?.full_name || selectedDP?.email || 'this delivery partner'}</strong>?
+              Are you sure you want to delete <strong>{selectedDP?.fullName || selectedDP?.email || 'this delivery partner'}</strong>?
             </DialogDescription>
           </DialogHeader>
           <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
@@ -824,7 +827,7 @@ export function DeliveryPartners() {
                 <SheetTitle className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-2">
                     <Bike className="h-5 w-5" />
-                    Orders for {selectedDPForOrders.full_name || 'Delivery Partner'}
+                    Orders for {selectedDPForOrders.fullName || 'Delivery Partner'}
                   </span>
                 </SheetTitle>
               </SheetHeader>
@@ -835,21 +838,21 @@ export function DeliveryPartners() {
                 <CardContent className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="text-xs text-muted-foreground">Name</div>
-                    <div className="text-sm">{selectedDPForOrders.full_name || '-'}</div>
+                    <div className="text-sm">{selectedDPForOrders.fullName || '-'}</div>
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">Phone</div>
-                    <div className="text-sm">{selectedDPForOrders.phone_number || '-'}</div>
+                    <div className="text-sm">{selectedDPForOrders.phoneNumber || '-'}</div>
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">Vehicle</div>
-                    <div className="text-sm capitalize">{selectedDPForOrders.vehicle_type || '-'}</div>
+                    <div className="text-sm capitalize">{selectedDPForOrders.vehicleType || '-'}</div>
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">Status</div>
                     <div className="text-sm">
-                      <Badge variant={selectedDPForOrders.is_online ? "default" : "secondary"}>
-                        {selectedDPForOrders.is_online ? "Online" : "Offline"}
+                      <Badge variant={selectedDPForOrders.isOnline ? "default" : "secondary"}>
+                        {selectedDPForOrders.isOnline ? "Online" : "Offline"}
                       </Badge>
                     </div>
                   </div>
@@ -902,33 +905,33 @@ export function DeliveryPartners() {
                                 <div className="flex items-center gap-2">
                                   <User2 className="h-4 w-4" />
                                   <div className="truncate">
-                                    <div className="font-medium truncate max-w-[180px]">{order.customer_name || "N/A"}</div>
+                                    <div className="font-medium truncate max-w-[180px]">{order.customerName || "N/A"}</div>
                                     <a
-                                      href={order.customer_phone ? `tel:${order.customer_phone}` : undefined}
-                                      className={cn("text-xs text-muted-foreground", !order.customer_phone && "pointer-events-none")}
+                                      href={order.customerPhone ? `tel:${order.customerPhone}` : undefined}
+                                      className={cn("text-xs text-muted-foreground", !order.customerPhone && "pointer-events-none")}
                                     >
-                                      {order.customer_phone || "-"}
+                                      {order.customerPhone || "-"}
                                     </a>
                                   </div>
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <div className="truncate max-w-[220px]">{order.restaurant_name || "N/A"}</div>
+                                <div className="truncate max-w-[220px]">{order.restaurantName || "N/A"}</div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
                                   <IndianRupee className="h-3 w-3" />
-                                  {Number(order.total_payment_amount || 0).toFixed(2)}
+                                  {Number(order.totalPaymentAmount || 0).toFixed(2)}
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <Badge variant={statusVariant(order.order_status)} className="capitalize">
-                                  {order.order_status.replaceAll("_", " ")}
+                                <Badge variant={statusVariant(order.orderStatus)} className="capitalize">
+                                  {order.orderStatus.replaceAll("_", " ")}
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                <div className="text-sm">{timeAgo(order.created_at)}</div>
-                                <div className="text-xs text-muted-foreground">{formatDateTime(order.created_at)}</div>
+                                <div className="text-sm">{timeAgo(order.createdAt)}</div>
+                                <div className="text-xs text-muted-foreground">{formatDateTime(order.createdAt)}</div>
                               </TableCell>
                             </TableRow>
                           ))}

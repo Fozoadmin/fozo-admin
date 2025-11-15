@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { adminApi } from "@/lib/api";
+import { subscribeToEvent, SOCKET_EVENTS } from "@/lib/socket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,52 +21,46 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Copy, ExternalLink, Loader2, MapPin, Phone, User2, Truck, IndianRupee, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ORDER_STATUS, getStatusLabel } from "@/constants/orderStatus";
+import type { OrderStatus } from "@/constants/orderStatus";
 
 // ------------------ Types ------------------
 export type Order = {
   id: string;
-  customer_id: string;
-  restaurant_id: string;
-  delivery_partner_id: string | null;
-  total_bag_amount: string; // "49.00"
-  delivery_fee: string; // "0.00"
-  platform_commission: string; // "10.00"
-  total_payment_amount: string; // "59.00"
-  delivery_address_snapshot: string;
-  delivery_latitude: string; // "12.929507"
-  delivery_longitude: string; // "77.677976"
-  customer_phone_snapshot: string;
-  customer_email_snapshot: string | null;
-  notes_to_restaurant: string | null;
-  order_status:
-    | "placed"
-    | "pending"
-    | "confirmed"
-    | "ready_for_pickup"
-    | "out_for_delivery"
-    | "delivered"
-    | "cancelled"
-    | "refunded";
-  payment_status: "paid" | "pending" | "failed";
-  payment_transaction_id: string | null;
-  payment_method: string | null;
-  order_date: string; // ISO date
-  restaurant_confirmed_at: string | null;
-  delivery_partner_assigned_at: string | null;
-  pickup_time_slot_start: string | null; // "18:00:00"
-  pickup_time_slot_end: string | null; // "23:00:00"
-  expected_delivery_time: string | null;
-  actual_delivery_time: string | null;
-  cancellation_reason: string | null;
-  cancelled_by_user_type: string | null;
-  created_at: string; // ISO date
-  updated_at: string; // ISO date
-  customer_name: string | null;
-  customer_phone: string | null;
-  restaurant_name: string | null;
-  restaurant_contact_person: string | null;
-  delivery_partner_name: string | null;
-  delivery_partner_phone: string | null;
+  customerId: string;
+  restaurantId: string;
+  deliveryPartnerId: string | null;
+  totalBagAmount: string; // "49.00"
+  deliveryFee: string; // "0.00"
+  platformCommission: string; // "10.00"
+  totalPaymentAmount: string; // "59.00"
+  deliveryAddressSnapshot: string;
+  deliveryLatitude: string; // "12.929507"
+  deliveryLongitude: string; // "77.677976"
+  customerPhoneSnapshot: string;
+  customerEmailSnapshot: string | null;
+  notesToRestaurant: string | null;
+  orderStatus: OrderStatus;
+  paymentStatus: "paid" | "pending" | "failed";
+  paymentTransactionId: string | null;
+  paymentMethod: string | null;
+  orderDate: string; // ISO date
+  restaurantConfirmedAt: string | null;
+  deliveryPartnerAssignedAt: string | null;
+  pickupTimeSlotStart: string | null; // "18:00:00"
+  pickupTimeSlotEnd: string | null; // "23:00:00"
+  expectedDeliveryTime: string | null;
+  actualDeliveryTime: string | null;
+  cancellationReason: string | null;
+  cancelledByUserType: string | null;
+  createdAt: string; // ISO date
+  updatedAt: string; // ISO date
+  customerName: string | null;
+  customerPhone: string | null;
+  restaurantName: string | null;
+  restaurantContactPerson: string | null;
+  deliveryPartnerName: string | null;
+  deliveryPartnerPhone: string | null;
 };
 
 export type DeliveryPartner = {
@@ -106,32 +101,36 @@ const formatDateTime = (iso?: string | null) => {
   });
 };
 
-const statusVariant = (s: Order["order_status"]) => {
+const statusVariant = (s: Order["orderStatus"]) => {
   switch (s) {
-    case "delivered":
+    case ORDER_STATUS.DELIVERED:
       return "default" as const;
-    case "cancelled":
-    case "refunded":
+    case ORDER_STATUS.CANCELLED_BY_USER:
+    case ORDER_STATUS.CANCELLED_BY_RESTAURANT:
+    case ORDER_STATUS.CANCELLED_BY_ADMIN:
+    case ORDER_STATUS.REFUNDED:
       return "destructive" as const;
-    case "out_for_delivery":
-    case "ready_for_pickup":
-    case "confirmed":
-    case "placed":
+    case ORDER_STATUS.OUT_FOR_DELIVERY:
+    case ORDER_STATUS.READY_FOR_PICKUP:
+    case ORDER_STATUS.CONFIRMED:
+    case ORDER_STATUS.PLACED:
       return "secondary" as const;
     default:
       return "outline" as const;
   }
 };
 
-const STATUS_OPTIONS: Array<Order["order_status"] | "all"> = [
+const STATUS_OPTIONS: Array<OrderStatus | "all"> = [
   "all",
-  "placed",
-  "pending",
-  "confirmed",
-  "out_for_delivery",
-  "delivered",
-  "cancelled",
-  "refunded",
+  ORDER_STATUS.PLACED,
+  ORDER_STATUS.CONFIRMED,
+  ORDER_STATUS.READY_FOR_PICKUP,
+  ORDER_STATUS.OUT_FOR_DELIVERY,
+  ORDER_STATUS.DELIVERED,
+  ORDER_STATUS.CANCELLED_BY_USER,
+  ORDER_STATUS.CANCELLED_BY_RESTAURANT,
+  ORDER_STATUS.CANCELLED_BY_ADMIN,
+  ORDER_STATUS.REFUNDED,
 ];
 
 function useDebounced<T>(value: T, delay = 300) {
@@ -169,7 +168,7 @@ export function Orders() {
         const data = await adminApi.getAllOrders();
         if (!isMounted) return;
         const sorted = [...(data?.orders ?? [])].sort(
-          (a: Order, b: Order) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          (a: Order, b: Order) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
         setOrders(sorted as Order[]);
       } catch (e: any) {
@@ -182,6 +181,30 @@ export function Orders() {
     })();
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  // Listen for new orders via socket
+  useEffect(() => {
+    const unsubscribe = subscribeToEvent<Order>(SOCKET_EVENTS.NEW_ORDER, (newOrder: Order) => {
+      console.log('Socket: Received new_order event', newOrder);
+      // Refetch all orders to ensure we have the latest data
+      adminApi.getAllOrders()
+        .then((data) => {
+          const sorted = [...(data?.orders ?? [])].sort(
+            (a: Order, b: Order) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          setOrders(sorted as Order[]);
+        })
+        .catch((err) => {
+          console.error('Error refetching orders after socket event:', err);
+        });
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, []);
 
@@ -198,8 +221,8 @@ export function Orders() {
 
         const normalized: DeliveryPartner[] = (rawData ?? []).map((d: any) => ({
           id: d.id,
-          fullName: d.full_name ?? d.fullName ?? null,
-          phoneNumber: d.phone_number ?? d.phoneNumber ?? null,
+          fullName: d.fullName ?? null,
+          phoneNumber: d.phoneNumber ?? null,
         }));
 
         setDpList(normalized);
@@ -221,8 +244,8 @@ export function Orders() {
     const counts: Record<string, number> = {};
     let revenue = 0;
     for (const o of orders) {
-      counts[o.order_status] = (counts[o.order_status] ?? 0) + 1;
-      revenue += Number(o.total_payment_amount || 0);
+      counts[o.orderStatus] = (counts[o.orderStatus] ?? 0) + 1;
+      revenue += Number(o.totalPaymentAmount || 0);
     }
     return {
       counts,
@@ -233,16 +256,16 @@ export function Orders() {
 
   const filtered = useMemo(() => {
     let out = orders;
-    if (status !== "all") out = out.filter((o) => o.order_status === status);
+    if (status !== "all") out = out.filter((o) => o.orderStatus === status);
     if (debouncedQuery.trim()) {
       const q = debouncedQuery.trim().toLowerCase();
       out = out.filter((o) => {
         return (
           o.id.toLowerCase().includes(q) ||
-          (o.customer_name?.toLowerCase() ?? "").includes(q) ||
-          (o.customer_phone?.toLowerCase() ?? "").includes(q) ||
-          (o.restaurant_name?.toLowerCase() ?? "").includes(q) ||
-          (o.delivery_partner_name?.toLowerCase() ?? "").includes(q)
+          (o.customerName?.toLowerCase() ?? "").includes(q) ||
+          (o.customerPhone?.toLowerCase() ?? "").includes(q) ||
+          (o.restaurantName?.toLowerCase() ?? "").includes(q) ||
+          (o.deliveryPartnerName?.toLowerCase() ?? "").includes(q)
         );
       });
     }
@@ -256,8 +279,8 @@ export function Orders() {
   };
 
   const openMapsUrl = (o: Order) => {
-    const lat = o.delivery_latitude;
-    const lng = o.delivery_longitude;
+    const lat = o.deliveryLatitude;
+    const lng = o.deliveryLongitude;
     const q = encodeURIComponent(`${lat},${lng}`);
     return `https://www.google.com/maps/search/?api=1&query=${q}`;
   };
@@ -265,27 +288,27 @@ export function Orders() {
   // --- Status update handler ---
   const handleStatusChange = async (
     order: Order,
-    newStatus: Order["order_status"]
+    newStatus: OrderStatus
   ) => {
-    if (newStatus === "out_for_delivery") {
+    if (newStatus === ORDER_STATUS.OUT_FOR_DELIVERY) {
       // Open assignment dialog; require a DP selection for admins per backend
       setPendingOutForDeliveryOrder(order);
-      setDpSelectedId(order.delivery_partner_id || "");
+      setDpSelectedId(order.deliveryPartnerId || "");
       setAssignOpen(true);
       return;
     }
 
-    const prev = order.order_status;
+    const prev = order.orderStatus;
     setUpdatingStatusId(order.id);
     try {
       // optimistic UI update
-      setOrders((os) => os.map((o) => (o.id === order.id ? { ...o, order_status: newStatus } : o)));
+      setOrders((os) => os.map((o) => (o.id === order.id ? { ...o, orderStatus: newStatus } : o)));
       await adminApi.updateOrderStatus(order.id, newStatus);
-      setSelected((sel) => (sel && sel.id === order.id ? { ...sel, order_status: newStatus } : sel));
+      setSelected((sel) => (sel && sel.id === order.id ? { ...sel, orderStatus: newStatus } : sel));
     } catch (e) {
       // revert on failure
-      setOrders((os) => os.map((o) => (o.id === order.id ? { ...o, order_status: prev } : o)));
-      setSelected((sel) => (sel && sel.id === order.id ? { ...sel, order_status: prev } : sel));
+      setOrders((os) => os.map((o) => (o.id === order.id ? { ...o, orderStatus: prev } : o)));
+      setSelected((sel) => (sel && sel.id === order.id ? { ...sel, orderStatus: prev } : sel));
     } finally {
       setUpdatingStatusId(null);
     }
@@ -303,23 +326,23 @@ export function Orders() {
           o.id === pendingOutForDeliveryOrder.id
             ? {
                 ...o,
-                order_status: "out_for_delivery",
-                delivery_partner_id: dpSelectedId,
-                delivery_partner_name: chosen?.fullName || o.delivery_partner_name || null,
-                delivery_partner_phone: chosen?.phoneNumber || o.delivery_partner_phone || null,
+                orderStatus: ORDER_STATUS.OUT_FOR_DELIVERY,
+                deliveryPartnerId: dpSelectedId,
+                deliveryPartnerName: chosen?.fullName || o.deliveryPartnerName || null,
+                deliveryPartnerPhone: chosen?.phoneNumber || o.deliveryPartnerPhone || null,
               }
             : o
         )
       );
-      await adminApi.updateOrderStatus(pendingOutForDeliveryOrder.id, "out_for_delivery", dpSelectedId);
+      await adminApi.updateOrderStatus(pendingOutForDeliveryOrder.id, ORDER_STATUS.OUT_FOR_DELIVERY, dpSelectedId);
       setSelected((sel) =>
         sel && sel.id === pendingOutForDeliveryOrder.id
           ? {
               ...sel,
-              order_status: "out_for_delivery",
-              delivery_partner_id: dpSelectedId,
-              delivery_partner_name: chosen?.fullName || sel.delivery_partner_name,
-              delivery_partner_phone: chosen?.phoneNumber || sel.delivery_partner_phone,
+              orderStatus: ORDER_STATUS.OUT_FOR_DELIVERY,
+              deliveryPartnerId: dpSelectedId,
+              deliveryPartnerName: chosen?.fullName || sel.deliveryPartnerName,
+              deliveryPartnerPhone: chosen?.phoneNumber || sel.deliveryPartnerPhone,
             }
           : sel
       );
@@ -346,12 +369,12 @@ export function Orders() {
               placeholder="Search by ID, customer, restaurant, phone"
               aria-label="Search orders"
             />
-            <Select value={status} onValueChange={(v) => setStatus(v as any)}>
+              <Select value={status} onValueChange={(v) => setStatus(v as any)}>
               <SelectTrigger className="w-[220px]"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 {STATUS_OPTIONS.map((s) => (
                   <SelectItem key={s} value={s}>
-                    {s === "all" ? "All Statuses" : s.replaceAll("_", " ")}
+                    {s === "all" ? "All Statuses" : getStatusLabel(s)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -370,7 +393,7 @@ export function Orders() {
             </div>
             <div className="rounded-xl border p-3 text-center">
               <div className="text-xs text-muted-foreground">Delivered</div>
-              <div className="text-lg font-semibold">{kpis.counts["delivered"] ?? 0}</div>
+              <div className="text-lg font-semibold">{kpis.counts[ORDER_STATUS.DELIVERED] ?? 0}</div>
             </div>
           </div>
         </CardContent>
@@ -435,24 +458,24 @@ export function Orders() {
                         <div className="flex items-center gap-2">
                           <User2 className="h-4 w-4" />
                           <div className="truncate">
-                            <div className="font-medium truncate max-w-[180px]">{o.customer_name || "N/A"}</div>
+                            <div className="font-medium truncate max-w-[180px]">{o.customerName || "N/A"}</div>
                             <a
-                              href={o.customer_phone ? `tel:${o.customer_phone}` : undefined}
-                              className={cn("text-xs text-muted-foreground", !o.customer_phone && "pointer-events-none")}
+                              href={o.customerPhone ? `tel:${o.customerPhone}` : undefined}
+                              className={cn("text-xs text-muted-foreground", !o.customerPhone && "pointer-events-none")}
                               onClick={(e) => e.stopPropagation()}
                             >
-                              {o.customer_phone || "-"}
+                              {o.customerPhone || "-"}
                             </a>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="truncate max-w-[220px]">{o.restaurant_name || "N/A"}</div>
+                        <div className="truncate max-w-[220px]">{o.restaurantName || "N/A"}</div>
                       </TableCell>
                       <TableCell>
-                        {o.pickup_time_slot_start && o.pickup_time_slot_end ? (
+                        {o.pickupTimeSlotStart && o.pickupTimeSlotEnd ? (
                           <div className="text-sm">
-                            {o.pickup_time_slot_start}–{o.pickup_time_slot_end}
+                            {o.pickupTimeSlotStart}–{o.pickupTimeSlotEnd}
                           </div>
                         ) : (
                           <span className="text-muted-foreground">-</span>
@@ -461,17 +484,17 @@ export function Orders() {
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <IndianRupee className="h-3 w-3" />
-                          {Number(o.total_payment_amount || 0).toFixed(2)}
+                          {Number(o.totalPaymentAmount || 0).toFixed(2)}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={statusVariant(o.order_status)} className="capitalize">
-                          {o.order_status.replaceAll("_", " ")}
+                        <Badge variant={statusVariant(o.orderStatus)} className="capitalize">
+                          {getStatusLabel(o.orderStatus)}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm">{timeAgo(o.created_at)}</div>
-                        <div className="text-xs text-muted-foreground">{formatDateTime(o.created_at)}</div>
+                        <div className="text-sm">{timeAgo(o.createdAt)}</div>
+                        <div className="text-xs text-muted-foreground">{formatDateTime(o.createdAt)}</div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -497,14 +520,14 @@ export function Orders() {
               {/* Quick Actions */}
               <div className="flex flex-wrap items-center gap-2">
                 <Select
-                  value={selected.order_status}
-                  onValueChange={(v) => handleStatusChange(selected, v as Order["order_status"])}
+                  value={selected.orderStatus}
+                  onValueChange={(v) => handleStatusChange(selected, v as OrderStatus)}
                 >
                   <SelectTrigger className="w-[240px]"><SelectValue placeholder="Update status" /></SelectTrigger>
                   <SelectContent>
                     {STATUS_OPTIONS.filter((s) => s !== "all").map((s) => (
                       <SelectItem key={s} value={s} className="capitalize">
-                        {s.replaceAll("_", " ")}
+                        {getStatusLabel(s)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -556,10 +579,10 @@ export function Orders() {
                 <CardHeader className="pb-2"><CardTitle className="text-base">Overview</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <InfoRow label="Order ID" value={selected.id} copyable />
-                  <InfoRow label="Created" value={formatDateTime(selected.created_at)} />
-                  <InfoRow label="Payment" value={selected.payment_status} icon={
-                    selected.payment_status === "paid" ? <CheckCircle2 className="h-4 w-4"/> : selected.payment_status === "failed" ? <XCircle className="h-4 w-4"/> : <Clock className="h-4 w-4"/>} />
-                  <InfoRow label="Txn ID" value={selected.payment_transaction_id || "-"} copyable />
+                  <InfoRow label="Created" value={formatDateTime(selected.createdAt)} />
+                  <InfoRow label="Payment" value={selected.paymentStatus} icon={
+                    selected.paymentStatus === "paid" ? <CheckCircle2 className="h-4 w-4"/> : selected.paymentStatus === "failed" ? <XCircle className="h-4 w-4"/> : <Clock className="h-4 w-4"/>} />
+                  <InfoRow label="Txn ID" value={selected.paymentTransactionId || "-"} copyable />
                 </CardContent>
               </Card>
 
@@ -567,11 +590,11 @@ export function Orders() {
               <Card className="rounded-xl">
                 <CardHeader className="pb-2"><CardTitle className="text-base">Amounts</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-2 gap-3">
-                  <MoneyRow label="Bag" value={selected.total_bag_amount} />
-                  <MoneyRow label="Delivery Fee" value={selected.delivery_fee} />
-                  <MoneyRow label="Platform Commission" value={selected.platform_commission} />
+                  <MoneyRow label="Bag" value={selected.totalBagAmount} />
+                  <MoneyRow label="Delivery Fee" value={selected.deliveryFee} />
+                  <MoneyRow label="Platform Commission" value={selected.platformCommission} />
                   <Separator className="col-span-2"/>
-                  <MoneyRow label="Total Collected" value={selected.total_payment_amount} bold />
+                  <MoneyRow label="Total Collected" value={selected.totalPaymentAmount} bold />
                 </CardContent>
               </Card>
 
@@ -582,32 +605,32 @@ export function Orders() {
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <div className="text-sm font-medium flex items-center gap-2"><User2 className="h-4 w-4"/>Customer</div>
-                      <div className="text-sm">{selected.customer_name || "-"}</div>
-                      <a className="text-xs text-muted-foreground inline-flex items-center gap-1" href={selected.customer_phone ? `tel:${selected.customer_phone}` : undefined} onClick={(e) => e.stopPropagation()}>
-                        <Phone className="h-3 w-3"/>{selected.customer_phone || "-"}
+                      <div className="text-sm">{selected.customerName || "-"}</div>
+                      <a className="text-xs text-muted-foreground inline-flex items-center gap-1" href={selected.customerPhone ? `tel:${selected.customerPhone}` : undefined} onClick={(e) => e.stopPropagation()}>
+                        <Phone className="h-3 w-3"/>{selected.customerPhone || "-"}
                       </a>
-                      <div className="text-xs text-muted-foreground">{selected.customer_email_snapshot || ""}</div>
+                      <div className="text-xs text-muted-foreground">{selected.customerEmailSnapshot || ""}</div>
                     </div>
                     <div className="space-y-1">
                       <div className="text-sm font-medium">Restaurant</div>
-                      <div className="text-sm">{selected.restaurant_name || "-"}</div>
-                      <div className="text-xs text-muted-foreground">Contact: {selected.restaurant_contact_person || "-"}</div>
+                      <div className="text-sm">{selected.restaurantName || "-"}</div>
+                      <div className="text-xs text-muted-foreground">Contact: {selected.restaurantContactPerson || "-"}</div>
                     </div>
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <div className="text-sm font-medium flex items-center gap-2"><Truck className="h-4 w-4"/>Delivery Partner</div>
-                      <div className="text-sm">{selected.delivery_partner_name || "Unassigned"}</div>
-                      <a className={cn("text-xs text-muted-foreground inline-flex items-center gap-1", !selected.delivery_partner_phone && "pointer-events-none")}
-                         href={selected.delivery_partner_phone ? `tel:${selected.delivery_partner_phone}` : undefined}
+                      <div className="text-sm">{selected.deliveryPartnerName || "Unassigned"}</div>
+                      <a className={cn("text-xs text-muted-foreground inline-flex items-center gap-1", !selected.deliveryPartnerPhone && "pointer-events-none")}
+                         href={selected.deliveryPartnerPhone ? `tel:${selected.deliveryPartnerPhone}` : undefined}
                          onClick={(e) => e.stopPropagation()}>
-                        <Phone className="h-3 w-3"/>{selected.delivery_partner_phone || "-"}
+                        <Phone className="h-3 w-3"/>{selected.deliveryPartnerPhone || "-"}
                       </a>
                     </div>
                     <div className="space-y-1">
                       <div className="text-sm font-medium flex items-center gap-2"><MapPin className="h-4 w-4"/>Delivery Address</div>
-                      <div className="text-sm leading-5 whitespace-pre-wrap">{selected.delivery_address_snapshot}</div>
+                      <div className="text-sm leading-5 whitespace-pre-wrap">{selected.deliveryAddressSnapshot}</div>
                       <a className="text-xs text-muted-foreground inline-flex items-center gap-1" href={openMapsUrl(selected)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
                         Open in Maps <ExternalLink className="h-3 w-3"/>
                       </a>
@@ -620,14 +643,14 @@ export function Orders() {
               <Card className="rounded-xl">
                 <CardHeader className="pb-2"><CardTitle className="text-base">Timing</CardTitle></CardHeader>
                 <CardContent className="grid grid-cols-2 gap-3">
-                  <InfoRow label="Order Date" value={formatDateTime(selected.order_date)} />
+                  <InfoRow label="Order Date" value={formatDateTime(selected.orderDate)} />
                   <InfoRow label="Pickup Window" value={
-                    selected.pickup_time_slot_start && selected.pickup_time_slot_end
-                      ? `${selected.pickup_time_slot_start}–${selected.pickup_time_slot_end}`
+                    selected.pickupTimeSlotStart && selected.pickupTimeSlotEnd
+                      ? `${selected.pickupTimeSlotStart}–${selected.pickupTimeSlotEnd}`
                       : "-"
                   } />
-                  <InfoRow label="Expected Delivery" value={formatDateTime(selected.expected_delivery_time)} />
-                  <InfoRow label="Actual Delivery" value={formatDateTime(selected.actual_delivery_time)} />
+                  <InfoRow label="Expected Delivery" value={formatDateTime(selected.expectedDeliveryTime)} />
+                  <InfoRow label="Actual Delivery" value={formatDateTime(selected.actualDeliveryTime)} />
                 </CardContent>
               </Card>
 
@@ -636,13 +659,13 @@ export function Orders() {
                 <CardHeader className="pb-2"><CardTitle className="text-base">Notes</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                   <div className="text-sm whitespace-pre-wrap min-h-[20px]">
-                    {selected.notes_to_restaurant || <span className="text-muted-foreground">No notes</span>}
+                    {selected.notesToRestaurant || <span className="text-muted-foreground">No notes</span>}
                   </div>
-                  {selected.cancellation_reason && (
+                  {selected.cancellationReason && (
                     <div className="rounded-lg bg-destructive/10 p-3 text-sm">
                       <div className="font-medium mb-1">Cancellation</div>
-                      <div className="text-sm">{selected.cancellation_reason}</div>
-                      <div className="text-xs text-muted-foreground mt-1">By: {selected.cancelled_by_user_type || "-"}</div>
+                      <div className="text-sm">{selected.cancellationReason}</div>
+                      <div className="text-xs text-muted-foreground mt-1">By: {selected.cancelledByUserType || "-"}</div>
                     </div>
                   )}
                 </CardContent>

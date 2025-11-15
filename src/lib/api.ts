@@ -1,15 +1,9 @@
+import type { OrderStatus } from '../constants/orderStatus';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const API_KEY = import.meta.env.VITE_API_KEY || '';
 
-type AdminOrderStatus =
-  | 'placed'
-  | 'pending'
-  | 'confirmed'
-  | 'ready_for_pickup'
-  | 'out_for_delivery'
-  | 'delivered'
-  | 'cancelled'
-  | 'refunded';
+type AdminOrderStatus = OrderStatus;
 
 
 interface RequestOptions extends RequestInit {
@@ -138,7 +132,7 @@ export const adminApi = {
       isClosed: boolean;
     }>;
     restaurantCuisineIds: number[];
-  }) => apiRequest<{ message: string; restaurant_id: string; status: string }>(
+  }) => apiRequest<{ message: string; restaurantId: string; status: string }>(
     '/admin/restaurants',
     { method: 'POST', body: JSON.stringify(body) }
   ),
@@ -165,7 +159,7 @@ export const adminApi = {
       accountHolderName: string;
       bankName: string;
     };
-  }) => apiRequest<{ message: string; user_id: string; status: string }>(
+  }) => apiRequest<{ message: string; userId: string; status: string }>(
     '/admin/delivery-partners',
     { method: 'POST', body: JSON.stringify(body) }
   ),
@@ -284,6 +278,13 @@ export const adminApi = {
         }),
       }
     ),
-  
+
+  // Settings Management
+  getSettings: () => apiRequest<Record<string, string>>('/admin/settings'),
+  updateSettings: (settingsData: Record<string, string>) =>
+    apiRequest<{ message: string; updated: any[]; changedKeys: string[]; changedSettings: Record<string, string> }>('/admin/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settingsData),
+    }),
 };
 

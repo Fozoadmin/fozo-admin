@@ -134,9 +134,9 @@ export function Customers() {
                   <TableRow 
                     key={c.id}
                   >
-                    <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => openCustomerDetail(c)}>{c.full_name || 'N/A'}</TableCell>
+                    <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => openCustomerDetail(c)}>{c.fullName || 'N/A'}</TableCell>
                     <TableCell>{c.email || 'N/A'}</TableCell>
-                    <TableCell>{c.phone_number || 'N/A'}</TableCell>
+                    <TableCell>{c.phoneNumber || 'N/A'}</TableCell>
                     <TableCell>
                       <Badge 
                         variant="default" 
@@ -146,11 +146,11 @@ export function Customers() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={c.is_verified ? "default" : "secondary"}>
-                        {c.is_verified ? "Verified" : "Unverified"}
+                      <Badge variant={c.isVerified ? "default" : "secondary"}>
+                        {c.isVerified ? "Verified" : "Unverified"}
                       </Badge>
                     </TableCell>
-                    <TableCell>{c.created_at ? new Date(c.created_at).toLocaleDateString() : 'N/A'}</TableCell>
+                    <TableCell>{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'N/A'}</TableCell>
                     <TableCell className="text-right">
                       <Button 
                         variant="ghost" 
@@ -183,7 +183,7 @@ export function Customers() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-                  <div className="text-sm mt-1">{selectedCustomer.full_name || '—'}</div>
+                  <div className="text-sm mt-1">{selectedCustomer.fullName || '—'}</div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Email</label>
@@ -191,36 +191,36 @@ export function Customers() {
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Phone Number</label>
-                  <div className="text-sm mt-1">{selectedCustomer.phone_number || '—'}</div>
+                  <div className="text-sm mt-1">{selectedCustomer.phoneNumber || '—'}</div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">User Type</label>
                   <div className="text-sm mt-1">
                     <Badge variant="default" className="bg-blue-100 text-blue-800 border-blue-200">
-                      {selectedCustomer.user_type}
+                      {selectedCustomer.userType}
                     </Badge>
                   </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Verified</label>
                   <div className="text-sm mt-1">
-                    <Badge variant={selectedCustomer.is_verified ? "default" : "secondary"}>
-                      {selectedCustomer.is_verified ? "Yes" : "No"}
+                    <Badge variant={selectedCustomer.isVerified ? "default" : "secondary"}>
+                      {selectedCustomer.isVerified ? "Yes" : "No"}
                     </Badge>
                   </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Active</label>
                   <div className="text-sm mt-1">
-                    <Badge variant={selectedCustomer.is_active ? "default" : "destructive"}>
-                      {selectedCustomer.is_active ? "Active" : "Inactive"}
+                    <Badge variant={selectedCustomer.isActive ? "default" : "destructive"}>
+                      {selectedCustomer.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Created At</label>
                   <div className="text-sm mt-1">
-                    {selectedCustomer.created_at ? new Date(selectedCustomer.created_at).toLocaleString() : '—'}
+                    {selectedCustomer.createdAt ? new Date(selectedCustomer.createdAt).toLocaleString() : '—'}
                   </div>
                 </div>
                 <div>
@@ -239,7 +239,7 @@ export function Customers() {
           <DialogHeader>
             <DialogTitle>Confirm Deletion</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete <strong>{selectedCustomer?.full_name || selectedCustomer?.email || 'this customer'}</strong>?
+              Are you sure you want to delete <strong>{selectedCustomer?.fullName || selectedCustomer?.email || 'this customer'}</strong>?
             </DialogDescription>
           </DialogHeader>
           <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">

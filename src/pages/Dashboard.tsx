@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   TopBar,
   Sidebar,
@@ -10,11 +10,11 @@ import {
   DeliveryPartners,
   Customers,
   SurpriseBags,
-  Finance,
+  // Finance,
   Settings,
 } from "@/components/dashboard";
 
-const cities = ["Mumbai", "Bengaluru", "Delhi", "Hyderabad", "Pune", "Chennai"];
+// const cities = ["Mumbai", "Bengaluru", "Delhi", "Hyderabad", "Pune", "Chennai"];
 
 export default function Dashboard() {
   const [active, setActive] = useState("overview");
@@ -33,7 +33,7 @@ export default function Dashboard() {
           <div className="mb-4 flex items-center justify-between">
             <h1 className="text-2xl lg:text-3xl font-bold capitalize">{active}</h1>
             <div className="flex items-center gap-2">
-              <Select defaultValue="Today">
+              {/* <Select defaultValue="Today">
                 <SelectTrigger className="w-40"><SelectValue placeholder="Date Range" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Today">Today</SelectItem>
@@ -47,7 +47,7 @@ export default function Dashboard() {
                   <SelectItem value="All Cities">All Cities</SelectItem>
                   {cities.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
-              </Select>
+              </Select> */}
             </div>
           </div>
 
@@ -59,7 +59,7 @@ export default function Dashboard() {
               <TabsTrigger value="riders" />
               <TabsTrigger value="bags" />
               <TabsTrigger value="customers" />
-              <TabsTrigger value="finance" />
+              {/* <TabsTrigger value="finance" /> */}
               <TabsTrigger value="settings" />
             </TabsList>
           </Tabs>
@@ -72,7 +72,7 @@ export default function Dashboard() {
             {active === "riders" && <DeliveryPartners />}
             {active === "bags" && <SurpriseBags />}
             {active === "customers" && <Customers />}
-            {active === "finance" && <Finance />}
+            {/* {active === "finance" && <Finance />} */}
             {active === "settings" && <Settings />}
           </div>
         </main>
