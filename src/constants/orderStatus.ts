@@ -58,8 +58,6 @@ export function getStatusLabel(status: OrderStatus): string {
       return 'Cancelled by Admin';
     case ORDER_STATUS.REFUNDED:
       return 'Refunded';
-    default:
-      return status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
   }
 }
 
