@@ -297,7 +297,7 @@ export function SurpriseBags() {
                       </div>
                       
                       <div>
-                        <label className="text-sm font-medium">Available Date</label>
+                        <label className="text-sm font-medium">Available Till Date</label>
                         <Input 
                           type="date" 
                           value={formB.availableDate} 
