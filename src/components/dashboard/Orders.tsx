@@ -61,6 +61,15 @@ export type Order = {
   restaurantContactPerson: string | null;
   deliveryPartnerName: string | null;
   deliveryPartnerPhone: string | null;
+  items: Array<{
+    bagId: string;
+    bagName: string;
+    bagIsVegetarian: boolean;
+    quantity: number;
+    pricePaid: number;
+    actualWorth: number;
+    co2SavedKg: number;
+  }>;
 };
 
 export type DeliveryPartner = {
@@ -595,6 +604,61 @@ export function Orders() {
                   <MoneyRow label="Platform Commission" value={selected.platformCommission} />
                   <Separator className="col-span-2"/>
                   <MoneyRow label="Total Collected" value={selected.totalPaymentAmount} bold />
+                </CardContent>
+              </Card>
+
+              {/* Items */}
+              <Card className="rounded-xl">
+                <CardHeader className="pb-2"><CardTitle className="text-base">Items</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  {selected.items && selected.items.length > 0 ? (
+                    <div className="space-y-2">
+                      {selected.items.map((item, index) => (
+                        <div
+                          key={item.bagId || index}
+                          className="flex items-start justify-between gap-3 rounded-lg border px-3 py-2"
+                        >
+                          <div className="space-y-1">
+                            <div className="text-sm font-medium flex items-center gap-2">
+                              <span>{item.bagName}</span>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "text-[10px] px-1 py-0.5",
+                                  item.bagIsVegetarian
+                                    ? "border-emerald-300 text-emerald-700 bg-emerald-50"
+                                    : "border-red-300 text-red-700 bg-red-50"
+                                )}
+                              >
+                                {item.bagIsVegetarian ? "Veg" : "Non-veg"}
+                              </Badge>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Qty: {item.quantity}
+                            </div>
+                          </div>
+                          <div className="text-right text-sm space-y-1">
+                            <div className="flex items-center justify-end gap-1">
+                              <IndianRupee className="h-3 w-3" />
+                              {Number(item.pricePaid || 0).toFixed(2)}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Worth {formatINR(item.actualWorth || 0)}
+                            </div>
+                            {typeof item.co2SavedKg === "number" && item.co2SavedKg > 0 && (
+                              <div className="text-[11px] text-emerald-600">
+                                CO₂ saved: {item.co2SavedKg} kg
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      No items found for this order.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
