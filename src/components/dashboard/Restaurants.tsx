@@ -17,6 +17,7 @@ import {
 import { Plus, MapPin, Loader2, Search, Building2, Edit, Trash2, CheckCircle2, XCircle, Ban } from "lucide-react";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { isTenDigitPhone, normalizePhoneDigits } from "@/lib/utils";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
@@ -236,6 +237,16 @@ export function Restaurants() {
         alert("Please provide either email or phone number");
         return;
       }
+
+      if (formR.phoneNumber && !isTenDigitPhone(formR.phoneNumber)) {
+        alert("Mobile number must be exactly 10 digits");
+        return;
+      }
+
+      if (location.contactNumber && !isTenDigitPhone(location.contactNumber)) {
+        alert("Mobile number must be exactly 10 digits");
+        return;
+      }
       
       if (!location.address || !location.latitude || !location.longitude) {
         alert("Please provide complete location details (Address, Latitude, Longitude)");
@@ -262,10 +273,13 @@ export function Restaurants() {
         closeTime: operatingHours[day].isClosed ? null : operatingHours[day].close + ':00',
         isClosed: operatingHours[day].isClosed
       }));
+
+      const userPhoneDigits = normalizePhoneDigits(formR.phoneNumber);
+      const locationPhoneDigits = normalizePhoneDigits(location.contactNumber);
       
       // Single API call to onboard restaurant with all details
       await adminApi.onboardRestaurant({
-        phoneNumber: formR.phoneNumber ? `+91${formR.phoneNumber}` : undefined,
+        phoneNumber: userPhoneDigits ? `+91${userPhoneDigits}` : undefined,
         email: formR.email || undefined,
         password: formR.password,
         fullName: formR.fullName,
@@ -280,7 +294,7 @@ export function Restaurants() {
           address: location.address,
           latitude: parseFloat(location.latitude),
           longitude: parseFloat(location.longitude),
-          contactNumber: location.contactNumber ? `+91${location.contactNumber}` : (formR.phoneNumber ? `+91${formR.phoneNumber}` : undefined),
+          contactNumber: locationPhoneDigits ? `+91${locationPhoneDigits}` : (userPhoneDigits ? `+91${userPhoneDigits}` : undefined),
           email: location.email || formR.email
         },
         operatingHours: hoursArray,
@@ -405,6 +419,12 @@ export function Restaurants() {
         closeTime: operatingHours[day].isClosed ? null : operatingHours[day].close + ':00',
         isClosed: operatingHours[day].isClosed
       }));
+
+      if (location.contactNumber && !isTenDigitPhone(location.contactNumber)) {
+        alert("Mobile number must be exactly 10 digits");
+        return;
+      }
+      const locationPhoneDigits = normalizePhoneDigits(location.contactNumber);
       
       // Update restaurant profile (basic info, location, hours, bank)
       await adminApi.updateRestaurantProfile(selectedRestaurant.restaurantId, {
@@ -418,7 +438,7 @@ export function Restaurants() {
           address: location.address,
           latitude: parseFloat(location.latitude),
           longitude: parseFloat(location.longitude),
-          contactNumber: location.contactNumber ? `+91${location.contactNumber}` : undefined,
+          contactNumber: locationPhoneDigits ? `+91${locationPhoneDigits}` : undefined,
           email: location.email || undefined
         },
         operatingHours: hoursArray

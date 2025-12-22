@@ -18,7 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, Bike, Trash2, Edit, CheckCircle2, XCircle, Ban, Loader2, Copy, User2, IndianRupee, Eye } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, isTenDigitPhone, normalizePhoneDigits } from "@/lib/utils";
 import { ORDER_STATUS } from "@/constants/orderStatus";
 
 export function DeliveryPartners() {
@@ -123,6 +123,12 @@ export function DeliveryPartners() {
         alert("Phone number is required for delivery partners (used for OTP login)");
         return;
       }
+
+      if (!isTenDigitPhone(formD.phoneNumber)) {
+        alert("Mobile number must be exactly 10 digits");
+        return;
+      }
+      const phoneDigits = normalizePhoneDigits(formD.phoneNumber);
       
       // Build bank details object if any field is provided
       const bankAccountDetails = (bankDetails.accountNumber || bankDetails.ifscCode) ? {
@@ -134,7 +140,7 @@ export function DeliveryPartners() {
       
       // Single API call to onboard delivery partner with all details
       await adminApi.onboardDeliveryPartner({
-        phoneNumber: `+91${formD.phoneNumber}`,
+        phoneNumber: `+91${phoneDigits}`,
         email: formD.email || undefined,
         password: formD.password || undefined,
         fullName: formD.fullName,
