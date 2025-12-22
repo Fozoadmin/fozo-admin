@@ -28,7 +28,11 @@ export function Overview() {
 
         if (!isMounted) return;
 
-        const totalRevenue = orders.orders.reduce((sum, order: any) => sum + (Number(order.total_amount) || 0), 0);
+        // Use the same revenue field shown in Orders tab; fall back for safety
+        const totalRevenue = orders.orders.reduce((sum, order: any) => {
+          const amount = Number(order.totalPaymentAmount ?? order.total_amount ?? 0);
+          return sum + (Number.isNaN(amount) ? 0 : amount);
+        }, 0);
 
         setStats({
           totalOrders: orders.orders.length,
