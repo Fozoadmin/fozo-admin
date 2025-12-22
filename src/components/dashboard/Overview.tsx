@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { adminApi } from "@/lib/api";
 import { StatCard } from "./StatCard";
-import { ShoppingBag, IndianRupee, UtensilsCrossed, Users } from "lucide-react";
+import { ShoppingBag, IndianRupee, UtensilsCrossed, Users, Truck } from "lucide-react";
 
 export function Overview() {
   const [stats, setStats] = useState({
@@ -11,6 +11,7 @@ export function Overview() {
     totalRestaurants: 0,
     totalCustomers: 0,
     totalBags: 0,
+    totalDeliveryPartners: 0,
     loading: true,
   });
 
@@ -19,11 +20,12 @@ export function Overview() {
     
     const fetchStats = async () => {
       try {
-        const [orders, restaurants, users, bags] = await Promise.all([
+        const [orders, restaurants, users, bags, deliveryPartners] = await Promise.all([
           adminApi.getAllOrders(),
           adminApi.getAllRestaurants(),
           adminApi.getAllUsers('customer'),
           adminApi.getAllSurpriseBags(),
+          adminApi.getAllDeliveryPartners(),
         ]);
 
         if (!isMounted) return;
@@ -40,6 +42,7 @@ export function Overview() {
           totalRestaurants: restaurants.length,
           totalCustomers: users.length,
           totalBags: bags.length,
+          totalDeliveryPartners: deliveryPartners.length ?? 0,
           loading: false,
         });
       } catch (error) {
@@ -58,7 +61,7 @@ export function Overview() {
 
   return (
     <div className="h-full w-full flex flex-col">
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6 w-full">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-6 w-full">
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
           <StatCard 
             icon={ShoppingBag} 
@@ -85,6 +88,13 @@ export function Overview() {
             icon={Users} 
             title="Total Customers" 
             value={stats.loading ? "..." : stats.totalCustomers} 
+          />
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+          <StatCard 
+            icon={Truck} 
+            title="Delivery Partners" 
+            value={stats.loading ? "..." : stats.totalDeliveryPartners} 
           />
         </motion.div>
       </div>
