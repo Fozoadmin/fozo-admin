@@ -66,7 +66,7 @@ export default function Dashboard() {
 
           {/* Views */}
           <div className="flex-1 overflow-auto">
-            {active === "overview" && <Overview />}
+            {active === "overview" && <Overview onNavigate={setActive} />}
             {active === "orders" && <Orders />}
             {active === "restaurants" && <Restaurants />}
             {active === "riders" && <DeliveryPartners />}

@@ -4,7 +4,11 @@ import { adminApi } from "@/lib/api";
 import { StatCard } from "./StatCard";
 import { ShoppingBag, IndianRupee, UtensilsCrossed, Users, Truck } from "lucide-react";
 
-export function Overview() {
+type OverviewProps = {
+  onNavigate?: (key: string) => void;
+};
+
+export function Overview({ onNavigate }: OverviewProps) {
   const [stats, setStats] = useState({
     totalOrders: 0,
     totalRevenue: 0,
@@ -66,7 +70,8 @@ export function Overview() {
           <StatCard 
             icon={ShoppingBag} 
             title="Total Orders" 
-            value={stats.loading ? "..." : stats.totalOrders.toLocaleString()} 
+            value={stats.loading ? "..." : stats.totalOrders.toLocaleString()}
+            onClick={() => onNavigate?.("orders")}
           />
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
@@ -74,27 +79,31 @@ export function Overview() {
             icon={IndianRupee} 
             title="Total Revenue" 
             value={stats.loading ? "..." : `₹${stats.totalRevenue.toFixed(2)}`}
+            onClick={() => onNavigate?.("orders")}
           />
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
           <StatCard 
             icon={UtensilsCrossed} 
             title="Restaurants" 
-            value={stats.loading ? "..." : stats.totalRestaurants} 
+            value={stats.loading ? "..." : stats.totalRestaurants}
+            onClick={() => onNavigate?.("restaurants")}
           />
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
           <StatCard 
             icon={Users} 
             title="Total Customers" 
-            value={stats.loading ? "..." : stats.totalCustomers} 
+            value={stats.loading ? "..." : stats.totalCustomers}
+            onClick={() => onNavigate?.("customers")}
           />
         </motion.div>
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
           <StatCard 
             icon={Truck} 
             title="Delivery Partners" 
-            value={stats.loading ? "..." : stats.totalDeliveryPartners} 
+            value={stats.loading ? "..." : stats.totalDeliveryPartners}
+            onClick={() => onNavigate?.("riders")}
           />
         </motion.div>
       </div>
