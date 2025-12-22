@@ -17,7 +17,8 @@ import {
 import { Plus, MapPin, Loader2, Search, Building2, Edit, Trash2, CheckCircle2, XCircle, Ban } from "lucide-react";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { isTenDigitPhone, normalizePhoneDigits } from "@/lib/utils";
+import { isTenDigitPhone, normalizePhoneDigits, apiRequestWithStatus } from "@/lib/utils";
+import { toast } from "react-toastify";
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
@@ -277,38 +278,58 @@ export function Restaurants() {
       const userPhoneDigits = normalizePhoneDigits(formR.phoneNumber);
       const locationPhoneDigits = normalizePhoneDigits(location.contactNumber);
       
-      // Single API call to onboard restaurant with all details
-      await adminApi.onboardRestaurant({
-        phoneNumber: userPhoneDigits ? `+91${userPhoneDigits}` : undefined,
-        email: formR.email || undefined,
-        password: formR.password,
-        fullName: formR.fullName,
-        userType: 'restaurant',
-        restaurantName: formR.restaurantName,
-        contactPersonName: formR.contactPersonName || formR.fullName,
-        fssaiLicenseNumber: formR.fssaiLicenseNumber || undefined,
-        gstinNumber: formR.gstinNumber || undefined,
-        bankAccountDetails,
-        primaryLocation: {
-          locationName: location.locationName || formR.restaurantName,
-          address: location.address,
-          latitude: parseFloat(location.latitude),
-          longitude: parseFloat(location.longitude),
-          contactNumber: locationPhoneDigits ? `+91${locationPhoneDigits}` : (userPhoneDigits ? `+91${userPhoneDigits}` : undefined),
-          email: location.email || formR.email
-        },
-        operatingHours: hoursArray,
-        restaurantCuisineIds: selectedCuisineIds
+      // Single API call to onboard restaurant with all details - using helper to get status
+      const result = await apiRequestWithStatus('/admin/restaurants', {
+        method: 'POST',
+        body: JSON.stringify({
+          phoneNumber: userPhoneDigits ? `+91${userPhoneDigits}` : undefined,
+          email: formR.email || undefined,
+          password: formR.password,
+          fullName: formR.fullName,
+          userType: 'restaurant',
+          restaurantName: formR.restaurantName,
+          contactPersonName: formR.contactPersonName || formR.fullName,
+          fssaiLicenseNumber: formR.fssaiLicenseNumber || undefined,
+          gstinNumber: formR.gstinNumber || undefined,
+          bankAccountDetails,
+          primaryLocation: {
+            locationName: location.locationName || formR.restaurantName,
+            address: location.address,
+            latitude: parseFloat(location.latitude),
+            longitude: parseFloat(location.longitude),
+            contactNumber: locationPhoneDigits ? `+91${locationPhoneDigits}` : (userPhoneDigits ? `+91${userPhoneDigits}` : undefined),
+            email: location.email || formR.email
+          },
+          operatingHours: hoursArray,
+          restaurantCuisineIds: selectedCuisineIds
+        })
       });
       
-      // Refresh the list
-      setRestaurants(await adminApi.getAllRestaurants());
-      setOpenAdd(false);
-      resetForm();
-      alert("Restaurant onboarded successfully!");
-    } catch (err) {
+      // Show toast based on status
+      if (result.status < 300) {
+        toast.success(result.message, {
+          position: "top-right",
+          autoClose: 3000,
+        });
+        // Refresh the list
+        setRestaurants(await adminApi.getAllRestaurants());
+        setOpenAdd(false);
+        resetForm();
+      } else {
+        // Show red toast for any error status (status >= 400)
+        toast.error(result.message, {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
+    } catch (err: any) {
       console.error('Create restaurant failed', err);
-      alert(`Failed to create restaurant: ${err}`);
+      // Show error toast for unexpected errors
+      const errorMessage = err?.message || "Failed to add restaurant";
+      toast.error(errorMessage, {
+        position: "top-right",
+        autoClose: 3000,
+      });
     } finally {
       setCreating(false);
     }
@@ -478,7 +499,10 @@ export function Restaurants() {
       setRestaurants(updatedRestaurants);
       setDeleteConfirm(false);
       setSelectedRestaurant(null);
-      alert("Restaurant deleted successfully!");
+      toast.success("Restaurant deleted successfully!", {
+        position: "top-right",
+        autoClose: 3000,
+      });
     } catch (error) {
       console.error('Delete failed', error);
       alert(`Failed to delete restaurant: ${error}`);
@@ -489,14 +513,36 @@ export function Restaurants() {
 
   const handleStatusChange = async (restaurantId: string, newStatus: string) => {
     try {
-      await adminApi.updateRestaurantStatus(restaurantId, newStatus as any);
+      // Use helper to get status code
+      const result = await apiRequestWithStatus(`/admin/restaurants/${restaurantId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: newStatus }),
+      });
       
-      // Refresh list
-      const updatedRestaurants = await adminApi.getAllRestaurants();
-      setRestaurants(updatedRestaurants);
-    } catch (error) {
+      // Show toast based on status
+      if (result.status < 300) {
+        toast.success(`Restaurant ${newStatus} successfully`, {
+          position: "top-right",
+          autoClose: 3000,
+        });
+        // Refresh list
+        const updatedRestaurants = await adminApi.getAllRestaurants();
+        setRestaurants(updatedRestaurants);
+      } else {
+        // Show red toast for any error status (status >= 400)
+        toast.error(result.message, {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
+    } catch (error: any) {
       console.error('Status update failed', error);
-      alert(`Failed to update status: ${error}`);
+      // Show error toast for unexpected errors
+      const errorMessage = error?.message || "Failed to update status";
+      toast.error(errorMessage, {
+        position: "top-right",
+        autoClose: 3000,
+      });
     }
   };
 

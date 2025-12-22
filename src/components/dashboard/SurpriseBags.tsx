@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, X, ChevronDown, ChevronRight } from "lucide-react";
+import { toast } from "react-toastify";
+import { apiRequestWithStatus } from "@/lib/utils";
 
 export function SurpriseBags() {
   const [groupedRestaurants, setGroupedRestaurants] = useState<any[]>([]);
@@ -146,28 +148,49 @@ export function SurpriseBags() {
         return;
       }
 
-      await adminApi.createSurpriseBag({
-        targetRestaurantId: selectedRestaurant.restaurantId || selectedRestaurant.id,
-        bagName: formB.bagName,
-        denominationValue: parseFloat(formB.denominationValue),
-        actualWorth: parseFloat(formB.actualWorth),
-        description: formB.description || undefined,
-        imageUrl: formB.imageUrl || undefined,
-        quantityAvailable: parseInt(formB.quantityAvailable),
-        pickupStartTime: formB.pickupStartTime ? formB.pickupStartTime + ':00' : undefined,
-        pickupEndTime: formB.pickupEndTime ? formB.pickupEndTime + ':00' : undefined,
-        availableDate: formB.availableDate || undefined,
-        isActive: formB.isActive,
-        isVegetarian: formB.isVegetarian
+      // Use helper to get status code
+      const result = await apiRequestWithStatus('/bags', {
+        method: 'POST',
+        body: JSON.stringify({
+          targetRestaurantId: selectedRestaurant.restaurantId || selectedRestaurant.id,
+          bagName: formB.bagName,
+          denominationValue: parseFloat(formB.denominationValue),
+          actualWorth: parseFloat(formB.actualWorth),
+          description: formB.description || undefined,
+          imageUrl: formB.imageUrl || undefined,
+          quantityAvailable: parseInt(formB.quantityAvailable),
+          pickupStartTime: formB.pickupStartTime ? formB.pickupStartTime + ':00' : undefined,
+          pickupEndTime: formB.pickupEndTime ? formB.pickupEndTime + ':00' : undefined,
+          availableDate: formB.availableDate || undefined,
+          isActive: formB.isActive,
+          isVegetarian: formB.isVegetarian
+        })
       });
       
-      setGroupedRestaurants(await adminApi.getGroupedSurpriseBags());
-      setOpenAdd(false);
-      resetForm();
-      alert("Surprise bag created successfully!");
-    } catch (err) {
+      // Show toast based on status
+      if (result.status < 300) {
+        toast.success(result.message, {
+          position: "top-right",
+          autoClose: 3000,
+        });
+        setGroupedRestaurants(await adminApi.getGroupedSurpriseBags());
+        setOpenAdd(false);
+        resetForm();
+      } else {
+        // Show red toast for any error status (status >= 400)
+        toast.error(result.message, {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
+    } catch (err: any) {
       console.error('Create surprise bag failed', err);
-      alert(`Failed to create surprise bag: ${err}`);
+      // Show error toast for unexpected errors
+      const errorMessage = err?.message || "Failed to create surprise bag";
+      toast.error(errorMessage, {
+        position: "top-right",
+        autoClose: 3000,
+      });
     } finally {
       setCreating(false);
     }

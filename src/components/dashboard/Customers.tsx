@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/table";
 import { Search, User, Trash2 } from "lucide-react";
 import { DialogDescription } from "@/components/ui/dialog";
+import { toast } from "react-toastify";
+import { apiRequestWithStatus } from "@/lib/utils";
 
 export function Customers() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -71,16 +73,36 @@ export function Customers() {
     
     try {
       setDeleting(true);
-      await adminApi.deleteUser(selectedCustomer.id);
+      // Use helper to get status code
+      const result = await apiRequestWithStatus(`/admin/users/${selectedCustomer.id}`, {
+        method: 'DELETE',
+      });
       
-      // Refresh list
-      await fetchCustomers(searchTerm);
-      setDeleteConfirm(false);
-      setSelectedCustomer(null);
-      alert("Customer deleted successfully!");
+      // Show toast based on status
+      if (result.status < 300) {
+        toast.success(result.message, {
+          position: "top-right",
+          autoClose: 3000,
+        });
+        // Refresh list
+        await fetchCustomers(searchTerm);
+        setDeleteConfirm(false);
+        setSelectedCustomer(null);
+      } else {
+        // Show red toast for any error status (status >= 400)
+        toast.error(result.message, {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
     } catch (error: any) {
       console.error('Delete failed', error);
-      alert(`Failed to delete customer: ${error?.message || error}`);
+      // Show error toast for unexpected errors
+      const errorMessage = error?.message || "Failed to delete customer";
+      toast.error(errorMessage, {
+        position: "top-right",
+        autoClose: 3000,
+      });
     } finally {
       setDeleting(false);
     }
