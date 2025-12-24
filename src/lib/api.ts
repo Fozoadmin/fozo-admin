@@ -286,5 +286,31 @@ export const adminApi = {
       method: 'PUT',
       body: JSON.stringify(settingsData),
     }),
+  // Finance Management
+  getRestaurantFinancialSummary: (restaurantIds?: string[], startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (restaurantIds && restaurantIds.length > 0) {
+      params.append('restaurantIds', restaurantIds.join(','));
+    }
+    if (startDate) {
+      params.append('startDate', startDate);
+    }
+    if (endDate) {
+      params.append('endDate', endDate);
+    }
+    return apiRequest<any[]>(`/admin/finance/restaurants${params.toString() ? `?${params.toString()}` : ''}`);
+  },
+  getDeliveryPartnerFinancialSummary: (deliveryPartnerIds?: string[], startDate?: string, endDate?: string) => {
+    const params = new URLSearchParams();
+    if (deliveryPartnerIds && deliveryPartnerIds.length > 0) {
+      params.append('deliveryPartnerIds', deliveryPartnerIds.join(','));
+    }
+    if (startDate) {
+      params.append('startDate', startDate);
+    }
+    if (endDate) {
+      params.append('endDate', endDate);
+    }
+    return apiRequest<any[]>(`/admin/finance/delivery-partners${params.toString() ? `?${params.toString()}` : ''}`);
+  },
 };
-

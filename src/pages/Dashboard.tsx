@@ -7,7 +7,7 @@ import {
   ShoppingBag,
   Bike,
   Users,
-  // IndianRupee,
+  IndianRupee,
   Cog,
 } from "lucide-react";
 // import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,7 +20,7 @@ import {
   DeliveryPartners,
   Customers,
   SurpriseBags,
-  // Finance,
+  Finance,
   Settings,
 } from "@/components/dashboard";
 
@@ -126,7 +126,7 @@ export default function Dashboard() {
             <Users className="h-4 w-4" />
             Customers
           </button>
-          {/* <button
+          <button
             onClick={() => {
               setActive("finance");
               setMobileSidebarOpen(false);
@@ -137,7 +137,7 @@ export default function Dashboard() {
           >
             <IndianRupee className="h-4 w-4" />
             Finance
-          </button> */}
+          </button>
           <button
             onClick={() => {
               setActive("settings");
@@ -186,10 +186,10 @@ export default function Dashboard() {
               <TabsTrigger value="orders" />
               <TabsTrigger value="restaurants" />
               <TabsTrigger value="riders" />
-              <TabsTrigger value="bags" />
-              <TabsTrigger value="customers" />
-              {/* <TabsTrigger value="finance" /> */}
-              <TabsTrigger value="settings" />
+            <TabsTrigger value="bags" />
+            <TabsTrigger value="customers" />
+            <TabsTrigger value="finance" />
+            <TabsTrigger value="settings" />
             </TabsList>
           </Tabs>
 
@@ -201,7 +201,7 @@ export default function Dashboard() {
             {active === "riders" && <DeliveryPartners />}
             {active === "bags" && <SurpriseBags />}
             {active === "customers" && <Customers />}
-            {/* {active === "finance" && <Finance />} */}
+            {active === "finance" && <Finance />}
             {active === "settings" && <Settings />}
           </div>
         </main>
