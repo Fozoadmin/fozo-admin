@@ -92,6 +92,10 @@ export function Restaurants() {
     bankName: ""
   });
 
+  // Image upload states
+  const [restaurantImageUrl, setRestaurantImageUrl] = useState<string>("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+
   useEffect(() => {
     fetchAllRestaurants();
     fetchCuisines();
@@ -141,6 +145,26 @@ export function Restaurants() {
     setRestaurants(allRestaurants);
   };
 
+  const handleImageUpload = async (file: File) => {
+    try {
+      setUploadingImage(true);
+      const result = await adminApi.uploadRestaurantImage(file);
+      setRestaurantImageUrl(result.imageUrl);
+      toast.success("Image uploaded successfully!", {
+        position: "top-right",
+        autoClose: 2000,
+      });
+    } catch (error: any) {
+      console.error('Image upload failed:', error);
+      toast.error(error.message || "Failed to upload image", {
+        position: "top-right",
+        autoClose: 3000,
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const openRestaurantDetail = (restaurant: any) => {
     setSelectedRestaurant(restaurant);
     setOpenDetail(true);
@@ -181,6 +205,7 @@ export function Restaurants() {
       bankName: ""
     });
     setSelectedCuisineIds([]);
+      setRestaurantImageUrl("");
   };
 
   // Geocode address to get lat/long
@@ -304,6 +329,7 @@ export function Restaurants() {
           contactPersonName: formR.contactPersonName || formR.fullName,
           fssaiLicenseNumber: formR.fssaiLicenseNumber || undefined,
           gstinNumber: formR.gstinNumber || undefined,
+          imageUrl: restaurantImageUrl || undefined,
           bankAccountDetails,
           primaryLocation: {
             locationName: location.locationName || formR.restaurantName,
@@ -419,6 +445,9 @@ export function Restaurants() {
       // Pre-fill cuisines
       setSelectedCuisineIds(fullDetails.cuisines ? fullDetails.cuisines.map((c: any) => c.id) : []);
       
+      // Pre-fill image URL
+      setRestaurantImageUrl(fullDetails.imageUrl || "");
+      
       setOpenEdit(true);
     } catch (error) {
       console.error('Error loading restaurant details:', error);
@@ -466,6 +495,7 @@ export function Restaurants() {
         contactPersonName: formR.contactPersonName,
         fssaiLicenseNumber: formR.fssaiLicenseNumber || undefined,
         gstinNumber: formR.gstinNumber || undefined,
+        imageUrl: restaurantImageUrl || undefined,
         bankAccountDetails,
         primaryLocation: {
           locationName: location.locationName || formR.restaurantName,
@@ -631,6 +661,36 @@ export function Restaurants() {
                     <div>
                       <label className="text-sm font-medium">GSTIN</label>
                       <Input value={formR.gstinNumber} onChange={e => setFormR({...formR, gstinNumber: e.target.value})} placeholder="22AAAAA0000A1Z5" />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-sm font-medium">Restaurant Image</label>
+                      <div className="space-y-2">
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleImageUpload(file);
+                            }
+                          }}
+                          disabled={uploadingImage}
+                          className="cursor-pointer"
+                        />
+                        {uploadingImage && (
+                          <p className="text-xs text-muted-foreground">Uploading image...</p>
+                        )}
+                        {restaurantImageUrl && (
+                          <div className="mt-2">
+                            <img 
+                              src={restaurantImageUrl} 
+                              alt="Restaurant preview" 
+                              className="w-32 h-32 object-cover rounded-md border"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">Image uploaded successfully</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                   
@@ -931,6 +991,19 @@ export function Restaurants() {
           </DialogHeader>
           {selectedRestaurant && (
             <div className="grid gap-6">
+              {/* Restaurant Image */}
+              {selectedRestaurant.imageUrl && (
+                <div className="flex justify-center">
+                  <div className="space-y-2">
+                    <img 
+                      src={selectedRestaurant.imageUrl} 
+                      alt={selectedRestaurant.restaurantName || 'Restaurant'} 
+                      className="w-full max-w-md h-64 object-cover rounded-lg border shadow-sm"
+                    />
+                  </div>
+                </div>
+              )}
+              
               {/* Basic Info */}
               <div>
                 <h3 className="font-semibold mb-3">Basic Information</h3>
@@ -1078,6 +1151,36 @@ export function Restaurants() {
                 <div>
                   <label className="text-sm font-medium">GSTIN</label>
                   <Input value={formR.gstinNumber} onChange={e => setFormR({...formR, gstinNumber: e.target.value})} placeholder="22AAAAA0000A1Z5" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium">Restaurant Image</label>
+                  <div className="space-y-2">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleImageUpload(file);
+                        }
+                      }}
+                      disabled={uploadingImage}
+                      className="cursor-pointer"
+                    />
+                    {uploadingImage && (
+                      <p className="text-xs text-muted-foreground">Uploading image...</p>
+                    )}
+                    {restaurantImageUrl && (
+                      <div className="mt-2">
+                        <img 
+                          src={restaurantImageUrl} 
+                          alt="Restaurant preview" 
+                          className="w-32 h-32 object-cover rounded-md border"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Image uploaded successfully</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </TabsContent>

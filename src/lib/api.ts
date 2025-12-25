@@ -201,6 +201,7 @@ export const adminApi = {
       contactPersonName?: string;
       fssaiLicenseNumber?: string;
       gstinNumber?: string;
+      imageUrl?: string;
       bankAccountDetails?: any;
       primaryLocation?: any;
       operatingHours?: any[];
@@ -312,5 +313,58 @@ export const adminApi = {
       params.append('endDate', endDate);
     }
     return apiRequest<any[]>(`/admin/finance/delivery-partners${params.toString() ? `?${params.toString()}` : ''}`);
+  },
+  // Image Upload
+  uploadRestaurantImage: async (file: File): Promise<{ imageUrl: string }> => {
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    const token = getAuthToken();
+    const headers: HeadersInit = {
+      'x-api-key': API_KEY,
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/upload/restaurant`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+      throw new Error(error.message || `HTTP ${response.status}`);
+    }
+    
+    return response.json();
+  },
+  uploadSurpriseBagImage: async (file: File): Promise<{ imageUrl: string }> => {
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    const token = getAuthToken();
+    const headers: HeadersInit = {
+      'x-api-key': API_KEY,
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/upload/surprise-bag`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+      throw new Error(error.message || `HTTP ${response.status}`);
+    }
+    
+    return response.json();
   },
 };

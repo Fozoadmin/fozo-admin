@@ -44,6 +44,11 @@ export function SurpriseBags() {
     isVegetarian: true
   });
 
+  // Image upload states
+  const [bagImage, setBagImage] = useState<File | null>(null);
+  const [bagImageUrl, setBagImageUrl] = useState<string>("");
+  const [uploadingImage, setUploadingImage] = useState(false);
+
   useEffect(() => {
     let isMounted = true;
     
@@ -141,6 +146,30 @@ export function SurpriseBags() {
     setSelectedRestaurant(null);
     setRestaurantSearchFilter("");
     setRestaurantDropdownOpen(false);
+    setBagImage(null);
+    setBagImageUrl("");
+  };
+
+  const handleImageUpload = async (file: File) => {
+    try {
+      setUploadingImage(true);
+      const result = await adminApi.uploadSurpriseBagImage(file);
+      setBagImageUrl(result.imageUrl);
+      setBagImage(file);
+      setFormB({...formB, imageUrl: result.imageUrl});
+      toast.success("Image uploaded successfully!", {
+        position: "top-right",
+        autoClose: 2000,
+      });
+    } catch (error: any) {
+      console.error('Image upload failed:', error);
+      toast.error(error.message || "Failed to upload image", {
+        position: "top-right",
+        autoClose: 3000,
+      });
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const isFormValid = () => {
@@ -171,7 +200,7 @@ export function SurpriseBags() {
           denominationValue: parseFloat(formB.denominationValue),
           actualWorth: parseFloat(formB.actualWorth),
           description: formB.description || undefined,
-          imageUrl: formB.imageUrl || undefined,
+          imageUrl: bagImageUrl || formB.imageUrl || undefined,
           quantityAvailable: parseInt(formB.quantityAvailable),
           pickupStartTime: formB.pickupStartTime ? formB.pickupStartTime + ':00' : undefined,
           pickupEndTime: formB.pickupEndTime ? formB.pickupEndTime + ':00' : undefined,
@@ -356,10 +385,36 @@ export function SurpriseBags() {
                         <Input value={formB.description} onChange={(e) => setFormB({...formB, description: e.target.value})} placeholder="Brief description of the bag contents" />
                       </div>
                       
-                      {/* <div className="col-span-2">
-                        <label className="text-sm font-medium">Image URL</label>
-                        <Input value={formB.imageUrl} onChange={(e) => setFormB({...formB, imageUrl: e.target.value})} placeholder="https://example.com/image.jpg" />
-                      </div> */}
+                      <div className="col-span-2">
+                        <label className="text-sm font-medium">Bag Image</label>
+                        <div className="space-y-2">
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleImageUpload(file);
+                              }
+                            }}
+                            disabled={uploadingImage}
+                            className="cursor-pointer"
+                          />
+                          {uploadingImage && (
+                            <p className="text-xs text-muted-foreground">Uploading image...</p>
+                          )}
+                          {bagImageUrl && (
+                            <div className="mt-2">
+                              <img 
+                                src={bagImageUrl} 
+                                alt="Bag preview" 
+                                className="w-32 h-32 object-cover rounded-md border"
+                              />
+                              <p className="text-xs text-muted-foreground mt-1">Image uploaded successfully</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     {/* Availability */}
