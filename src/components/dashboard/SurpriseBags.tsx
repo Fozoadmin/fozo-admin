@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, X, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, X, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "react-toastify";
 import { apiRequestWithStatus } from "@/lib/utils";
 
@@ -24,10 +24,10 @@ export function SurpriseBags() {
   const [openAdd, setOpenAdd] = useState(false);
   const [creating, setCreating] = useState(false);
   
-  // Restaurant search
-  const [restaurantSearch, setRestaurantSearch] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [searching, setSearching] = useState(false);
+  // Restaurant dropdown states
+  const [allRestaurants, setAllRestaurants] = useState<any[]>([]);
+  const [restaurantDropdownOpen, setRestaurantDropdownOpen] = useState(false);
+  const [restaurantSearchFilter, setRestaurantSearchFilter] = useState("");
   const [selectedRestaurant, setSelectedRestaurant] = useState<any | null>(null);
   
   const [formB, setFormB] = useState({
@@ -49,12 +49,17 @@ export function SurpriseBags() {
     
     const fetchData = async () => {
       try {
-        const groupedData = await adminApi.getGroupedSurpriseBags();
+        const [groupedData, restaurants] = await Promise.all([
+          adminApi.getGroupedSurpriseBags(),
+          adminApi.getAllRestaurants()
+        ]);
         if (!isMounted) return;
         setGroupedRestaurants(groupedData);
+        // Filter only approved restaurants
+        setAllRestaurants(restaurants.filter(r => r.status === 'approved'));
       } catch (error) {
         if (!isMounted) return;
-        console.error('Error fetching surprise bags:', error);
+        console.error('Error fetching data:', error);
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -69,6 +74,23 @@ export function SurpriseBags() {
     };
   }, []);
 
+  // Click outside handler to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (restaurantDropdownOpen && !target.closest('.restaurant-dropdown-container')) {
+        setRestaurantDropdownOpen(false);
+      }
+    };
+
+    if (restaurantDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [restaurantDropdownOpen]);
+
   const toggleRestaurant = (restaurantId: string) => {
     setExpandedRestaurants(prev => {
       const newSet = new Set(prev);
@@ -81,33 +103,25 @@ export function SurpriseBags() {
     });
   };
 
-  // Search restaurants
-  const handleSearchRestaurants = async () => {
-    if (!restaurantSearch.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    try {
-      setSearching(true);
-      const results = await adminApi.getAllRestaurants(restaurantSearch);
-      setSearchResults(results.filter(r => r.status === 'approved'));
-    } catch (error) {
-      console.error('Error searching restaurants:', error);
-      alert('Failed to search restaurants');
-    } finally {
-      setSearching(false);
-    }
-  };
+  // Filter restaurants based on search
+  const filteredRestaurants = allRestaurants.filter((restaurant) => {
+    if (!restaurantSearchFilter.trim()) return true;
+    const searchTerm = restaurantSearchFilter.toLowerCase();
+    const name = restaurant.restaurantName?.toLowerCase() || '';
+    const email = restaurant.userEmail?.toLowerCase() || '';
+    const phone = restaurant.phoneNumber?.toLowerCase() || '';
+    return name.includes(searchTerm) || email.includes(searchTerm) || phone.includes(searchTerm);
+  });
 
   const selectRestaurant = (restaurant: any) => {
     setSelectedRestaurant(restaurant);
-    setSearchResults([]);
-    setRestaurantSearch("");
+    setRestaurantDropdownOpen(false);
+    setRestaurantSearchFilter("");
   };
 
   const clearSelectedRestaurant = () => {
     setSelectedRestaurant(null);
+    setRestaurantSearchFilter("");
   };
 
   const resetForm = () => {
@@ -125,8 +139,8 @@ export function SurpriseBags() {
       isVegetarian: true
     });
     setSelectedRestaurant(null);
-    setRestaurantSearch("");
-    setSearchResults([]);
+    setRestaurantSearchFilter("");
+    setRestaurantDropdownOpen(false);
   };
 
   const isFormValid = () => {
@@ -205,16 +219,16 @@ export function SurpriseBags() {
             <DialogTrigger asChild>
               <Button className="gap-2"><Plus className="h-4 w-4"/>Add Surprise Bag</Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-2xl max-h-[95vh] min-h-[400px] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add Surprise Bag</DialogTitle>
                 <DialogDescription>Search for a restaurant and create a surprise bag</DialogDescription>
               </DialogHeader>
               
               <div className="grid gap-4">
-                {/* Restaurant Search */}
+                {/* Restaurant Selection Dropdown */}
                 <div className="space-y-3">
-                  <label className="text-sm font-medium">Search Restaurant *</label>
+                  <label className="text-sm font-medium">Select Restaurant *</label>
                   {selectedRestaurant ? (
                     <div className="flex items-center justify-between p-3 border rounded-lg bg-green-50 border-green-200">
                       <div>
@@ -226,39 +240,81 @@ export function SurpriseBags() {
                       </Button>
                     </div>
                   ) : (
-                    <>
-                      <div className="flex gap-2">
-                        <Input 
-                          value={restaurantSearch} 
-                          onChange={(e) => setRestaurantSearch(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && handleSearchRestaurants()}
-                          placeholder="Search by name, email, or phone" 
-                        />
-                        <Button onClick={handleSearchRestaurants} disabled={searching} className="gap-2">
-                          <Search className="h-4 w-4" />
-                          {searching ? 'Searching...' : 'Search'}
-                        </Button>
-                      </div>
-                      {searchResults.length > 0 && (
-                        <div className="border rounded-lg max-h-48 overflow-y-auto">
-                          {searchResults.map((restaurant) => (
-                            <div
-                              key={restaurant.restaurantId}
-                              className="p-3 hover:bg-muted cursor-pointer border-b last:border-b-0"
-                              onClick={() => selectRestaurant(restaurant)}
-                            >
-                              <div className="font-medium">{restaurant.restaurantName}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {restaurant.userEmail || restaurant.phoneNumber}
-                              </div>
-                            </div>
-                          ))}
+                    <div className="relative restaurant-dropdown-container">
+                      <div className="relative">
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRestaurantDropdownOpen(!restaurantDropdownOpen);
+                          }}
+                          className="min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer hover:border-ring flex items-center justify-between"
+                        >
+                          <div className="flex items-center flex-1">
+                            <span className="text-muted-foreground">Select a restaurant...</span>
+                          </div>
+                          <ChevronDown className={`h-4 w-4 ml-2 transition-transform ${restaurantDropdownOpen ? 'rotate-180' : ''}`} />
                         </div>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        Only approved restaurants will appear in search results
+
+                        {/* Dropdown Menu */}
+                        {restaurantDropdownOpen && (
+                          <div className="absolute z-50 w-full mt-1 bg-background border border-input rounded-md shadow-lg">
+                            <div className="p-2 border-b">
+                              <Input
+                                placeholder="Search restaurants..."
+                                value={restaurantSearchFilter}
+                                onChange={(e) => setRestaurantSearchFilter(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="h-8"
+                                autoFocus
+                              />
+                            </div>
+                            {restaurantSearchFilter && (
+                              <div className="p-2 border-b">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRestaurantSearchFilter("");
+                                  }}
+                                  className="w-full text-xs"
+                                >
+                                  Clear Search
+                                </Button>
+                              </div>
+                            )}
+                            <div className="max-h-64 overflow-auto p-1" onClick={(e) => e.stopPropagation()}>
+                              {filteredRestaurants.length === 0 ? (
+                                <div className="px-2 py-4 text-sm text-center text-muted-foreground">
+                                  No restaurants found
+                                </div>
+                              ) : (
+                                filteredRestaurants.map((restaurant) => {
+                                  const restaurantId = restaurant.restaurantId || restaurant.id;
+                                  return (
+                                    <div
+                                      key={restaurantId}
+                                      onClick={() => selectRestaurant(restaurant)}
+                                      className="flex items-center px-2 py-1.5 text-sm rounded cursor-pointer hover:bg-accent"
+                                    >
+                                      <div className="flex-1">
+                                        <div className="font-medium">{restaurant.restaurantName}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                          {restaurant.userEmail || restaurant.phoneNumber}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Only approved restaurants are shown
                       </p>
-                    </>
+                    </div>
                   )}
                 </div>
 
