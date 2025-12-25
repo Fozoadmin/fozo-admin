@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, MapPin, Loader2, Search, Building2, Edit, Trash2, CheckCircle2, XCircle, Ban } from "lucide-react";
+import { Plus, MapPin, Loader2, Building2, Edit, Trash2, CheckCircle2, XCircle, Ban, Search } from "lucide-react";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { isTenDigitPhone, normalizePhoneDigits, apiRequestWithStatus } from "@/lib/utils";
@@ -31,9 +31,9 @@ export function Restaurants() {
   const [creating, setCreating] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
   
-  // Search
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searching, setSearching] = useState(false);
+  // Search states
+  const [allRestaurants, setAllRestaurants] = useState<any[]>([]);
+  const [restaurantSearchFilter, setRestaurantSearchFilter] = useState("");
   
   // Detail popup
   const [selectedRestaurant, setSelectedRestaurant] = useState<any | null>(null);
@@ -93,9 +93,39 @@ export function Restaurants() {
   });
 
   useEffect(() => {
-    fetchRestaurants();
+    fetchAllRestaurants();
     fetchCuisines();
   }, []);
+
+  // Fetch all restaurants for dropdown
+  const fetchAllRestaurants = async () => {
+    try {
+      const data = await adminApi.getAllRestaurants();
+      setAllRestaurants(data);
+      setRestaurants(data);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching restaurants:', error);
+      setLoading(false);
+    }
+  };
+
+  // Real-time local search filtering
+  useEffect(() => {
+    if (restaurantSearchFilter.trim()) {
+      const searchTerm = restaurantSearchFilter.toLowerCase().trim();
+      const filtered = allRestaurants.filter((restaurant) => {
+        const name = restaurant.restaurantName?.toLowerCase() || '';
+        const email = restaurant.userEmail?.toLowerCase() || '';
+        const phone = restaurant.phoneNumber?.toLowerCase() || '';
+        return name.includes(searchTerm) || email.includes(searchTerm) || phone.includes(searchTerm);
+      });
+      setRestaurants(filtered);
+    } else {
+      // If search is empty, show all restaurants
+      setRestaurants(allRestaurants);
+    }
+  }, [restaurantSearchFilter, allRestaurants]);
 
   const fetchCuisines = async () => {
     try {
@@ -106,26 +136,9 @@ export function Restaurants() {
     }
   };
 
-  const fetchRestaurants = async (search?: string) => {
-    try {
-      setSearching(true);
-      const data = await adminApi.getAllRestaurants(search);
-      setRestaurants(data);
-    } catch (error) {
-      console.error('Error fetching restaurants:', error);
-    } finally {
-      setLoading(false);
-      setSearching(false);
-    }
-  };
-
-  const handleSearch = () => {
-    fetchRestaurants(searchTerm);
-  };
-
   const handleClearSearch = () => {
-    setSearchTerm("");
-    fetchRestaurants();
+    setRestaurantSearchFilter("");
+    setRestaurants(allRestaurants);
   };
 
   const openRestaurantDetail = (restaurant: any) => {
@@ -791,20 +804,22 @@ export function Restaurants() {
             </DialogContent>
           </Dialog>
           </div>
-          <div className="flex gap-2">
-            <Input 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="Search by name, email, or phone"
-              className="max-w-md"
-            />
-            <Button onClick={handleSearch} disabled={searching} className="gap-2">
-              <Search className="h-4 w-4" />
-              Search
-            </Button>
-            {searchTerm && (
-              <Button variant="outline" onClick={handleClearSearch}>
+          {/* Restaurant Real-time Search */}
+          <div className="flex gap-2 items-end">
+            <div className="flex-1 max-w-md">
+              <label className="text-sm font-medium mb-1 block">Search Restaurants</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={restaurantSearchFilter}
+                  onChange={(e) => setRestaurantSearchFilter(e.target.value)}
+                  placeholder="Search by name, email, or phone..."
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            {restaurantSearchFilter && (
+              <Button variant="outline" onClick={handleClearSearch} className="mb-0">
                 Clear
               </Button>
             )}
