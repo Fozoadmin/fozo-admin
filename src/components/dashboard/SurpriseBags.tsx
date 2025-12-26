@@ -632,7 +632,7 @@ export function SurpriseBags() {
 
                   {/* Expanded Bags Table */}
                   {expandedRestaurants.has(restaurant.restaurantId) && (
-                    <div className="border-t">
+                    <div className="border-t p-4">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -641,6 +641,7 @@ export function SurpriseBags() {
                             <TableHead>Worth</TableHead>
                             <TableHead>Quantity</TableHead>
                             <TableHead>Pickup Time</TableHead>
+                            <TableHead>Veg/Non-Veg</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Date</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
@@ -660,6 +661,14 @@ export function SurpriseBags() {
                               <TableCell>{bag.quantityAvailable || 0}</TableCell>
                               <TableCell className="text-sm">
                                 {bag.pickupTime || 'N/A'}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge 
+                                  variant={bag.isVegetarian ? "default" : "destructive"}
+                                  className={bag.isVegetarian ? "bg-green-600 text-white border-transparent hover:bg-green-700" : ""}
+                                >
+                                  {bag.isVegetarian ? "Veg" : "Non-Veg"}
+                                </Badge>
                               </TableCell>
                               <TableCell>
                                 <Badge variant={bag.isActive ? "default" : "secondary"}>
