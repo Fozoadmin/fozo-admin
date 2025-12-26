@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, X, ChevronDown, ChevronRight, Edit } from "lucide-react";
 import { toast } from "react-toastify";
 import { apiRequestWithStatus } from "@/lib/utils";
 
@@ -23,6 +23,12 @@ export function SurpriseBags() {
   const [loading, setLoading] = useState(true);
   const [openAdd, setOpenAdd] = useState(false);
   const [creating, setCreating] = useState(false);
+  
+  // Detail and Edit dialogs
+  const [selectedBag, setSelectedBag] = useState<any | null>(null);
+  const [openDetail, setOpenDetail] = useState(false);
+  const [openEdit, setOpenEdit] = useState(false);
+  const [editing, setEditing] = useState(false);
   
   // Restaurant dropdown states
   const [allRestaurants, setAllRestaurants] = useState<any[]>([]);
@@ -45,7 +51,6 @@ export function SurpriseBags() {
   });
 
   // Image upload states
-  const [bagImage, setBagImage] = useState<File | null>(null);
   const [bagImageUrl, setBagImageUrl] = useState<string>("");
   const [uploadingImage, setUploadingImage] = useState(false);
 
@@ -146,7 +151,6 @@ export function SurpriseBags() {
     setSelectedRestaurant(null);
     setRestaurantSearchFilter("");
     setRestaurantDropdownOpen(false);
-    setBagImage(null);
     setBagImageUrl("");
   };
 
@@ -155,7 +159,6 @@ export function SurpriseBags() {
       setUploadingImage(true);
       const result = await adminApi.uploadSurpriseBagImage(file);
       setBagImageUrl(result.imageUrl);
-      setBagImage(file);
       setFormB({...formB, imageUrl: result.imageUrl});
       toast.success("Image uploaded successfully!", {
         position: "top-right",
@@ -236,6 +239,94 @@ export function SurpriseBags() {
       });
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openBagDetail = (bag: any, restaurant: any) => {
+    setSelectedBag({ ...bag, restaurant });
+    setOpenDetail(true);
+  };
+
+  const openEditDialog = (bag: any, restaurant: any) => {
+    setSelectedBag({ ...bag, restaurant });
+    
+    // Pre-fill form with existing bag data
+    setFormB({
+      bagName: bag.bagName || "",
+      denominationValue: bag.denominationValue?.toString() || "",
+      actualWorth: bag.actualWorth?.toString() || "",
+      description: bag.description || "",
+      imageUrl: bag.imageUrl || "",
+      quantityAvailable: bag.quantityAvailable?.toString() || "",
+      pickupStartTime: bag.pickupStartTime ? bag.pickupStartTime.substring(0, 5) : "",
+      pickupEndTime: bag.pickupEndTime ? bag.pickupEndTime.substring(0, 5) : "",
+      availableDate: bag.availableDate ? bag.availableDate.split('T')[0] : "",
+      isActive: bag.isActive !== undefined ? bag.isActive : true,
+      isVegetarian: bag.isVegetarian !== undefined ? bag.isVegetarian : true
+    });
+    
+    // Set restaurant
+    setSelectedRestaurant(restaurant);
+    
+    // Set image URL
+    setBagImageUrl(bag.imageUrl || "");
+    
+    setOpenEdit(true);
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedBag) return;
+    
+    try {
+      setEditing(true);
+      
+      if (!formB.bagName || !formB.denominationValue || !formB.actualWorth || !formB.quantityAvailable) {
+        alert("Please fill in all required fields");
+        return;
+      }
+
+      const result = await apiRequestWithStatus(`/bags/${selectedBag.bagId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          targetRestaurantId: selectedBag.restaurant.restaurantId || selectedBag.restaurant.id,
+          bagName: formB.bagName,
+          denominationValue: parseFloat(formB.denominationValue),
+          actualWorth: parseFloat(formB.actualWorth),
+          description: formB.description || undefined,
+          imageUrl: bagImageUrl || formB.imageUrl || undefined,
+          quantityAvailable: parseInt(formB.quantityAvailable),
+          pickupStartTime: formB.pickupStartTime ? formB.pickupStartTime + ':00' : undefined,
+          pickupEndTime: formB.pickupEndTime ? formB.pickupEndTime + ':00' : undefined,
+          availableDate: formB.availableDate || undefined,
+          isActive: formB.isActive,
+          isVegetarian: formB.isVegetarian
+        })
+      });
+      
+      if (result.status < 300) {
+        toast.success(result.message, {
+          position: "top-right",
+          autoClose: 3000,
+        });
+        setGroupedRestaurants(await adminApi.getGroupedSurpriseBags());
+        setOpenEdit(false);
+        resetForm();
+        setSelectedBag(null);
+      } else {
+        toast.error(result.message, {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
+    } catch (err: any) {
+      console.error('Update surprise bag failed', err);
+      const errorMessage = err?.message || "Failed to update surprise bag";
+      toast.error(errorMessage, {
+        position: "top-right",
+        autoClose: 3000,
+      });
+    } finally {
+      setEditing(false);
     }
   };
 
@@ -552,12 +643,18 @@ export function SurpriseBags() {
                             <TableHead>Pickup Time</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Date</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {restaurant.bags.map((bag: any) => (
                             <TableRow key={bag.bagId} className="hover:bg-muted/30 font-light">
-                              <TableCell className="font-light">{bag.bagName || 'N/A'}</TableCell>
+                              <TableCell 
+                                className="font-medium cursor-pointer hover:underline" 
+                                onClick={() => openBagDetail(bag, restaurant)}
+                              >
+                                {bag.bagName || 'N/A'}
+                              </TableCell>
                               <TableCell>₹{Number(bag.denominationValue || 0).toFixed(2)}</TableCell>
                               <TableCell>₹{Number(bag.actualWorth || 0).toFixed(2)}</TableCell>
                               <TableCell>{bag.quantityAvailable || 0}</TableCell>
@@ -572,6 +669,19 @@ export function SurpriseBags() {
                               <TableCell>
                                 {bag.availableDate ? new Date(bag.availableDate).toLocaleDateString() : 'N/A'}
                               </TableCell>
+                              <TableCell className="text-right">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditDialog(bag, restaurant);
+                                  }}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -584,6 +694,287 @@ export function SurpriseBags() {
           )}
         </CardContent>
       </Card>
+
+      {/* Bag Detail Dialog */}
+      <Dialog open={openDetail} onOpenChange={setOpenDetail}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Surprise Bag Details</DialogTitle>
+          </DialogHeader>
+          {selectedBag && (
+            <div className="grid gap-6">
+              {/* Bag Image */}
+              <div className="flex justify-center">
+                {selectedBag.imageUrl ? (
+                  <img 
+                    src={selectedBag.imageUrl} 
+                    alt={selectedBag.bagName || 'Surprise Bag'} 
+                    className="w-full max-w-md h-64 object-contain rounded-lg border shadow-sm"
+                    onError={(e) => {
+                      console.error('Failed to load image:', selectedBag.imageUrl);
+                      e.currentTarget.onerror = null; // Prevent infinite loop
+                      e.currentTarget.src = ''; // Clear src to show alt/placeholder
+                    }}
+                  />
+                ) : (
+                  <div className="w-full max-w-md h-64 flex items-center justify-center border rounded-lg bg-muted/30">
+                    <p className="text-sm text-muted-foreground">No image available</p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Basic Info */}
+              <div>
+                <h3 className="font-semibold mb-3">Basic Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Bag Name</label>
+                    <div className="text-sm mt-1">{selectedBag.bagName || '—'}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Restaurant</label>
+                    <div className="text-sm mt-1">{selectedBag.restaurant?.restaurantName || '—'}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Customer Pays</label>
+                    <div className="text-sm mt-1">₹{Number(selectedBag.denominationValue || 0).toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Actual Worth</label>
+                    <div className="text-sm mt-1">₹{Number(selectedBag.actualWorth || 0).toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Quantity Available</label>
+                    <div className="text-sm mt-1">{selectedBag.quantityAvailable || 0}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Status</label>
+                    <div className="text-sm mt-1">
+                      <Badge variant={selectedBag.isActive ? "default" : "secondary"}>
+                        {selectedBag.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Vegetarian</label>
+                    <div className="text-sm mt-1">
+                      <Badge variant={selectedBag.isVegetarian ? "default" : "secondary"}>
+                        {selectedBag.isVegetarian ? "Yes" : "No"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Available Date</label>
+                    <div className="text-sm mt-1">
+                      {selectedBag.availableDate ? new Date(selectedBag.availableDate).toLocaleDateString() : '—'}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Pickup Start Time</label>
+                    <div className="text-sm mt-1">{selectedBag.pickupStartTime || '—'}</div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Pickup End Time</label>
+                    <div className="text-sm mt-1">{selectedBag.pickupEndTime || '—'}</div>
+                  </div>
+                  {selectedBag.description && (
+                    <div className="col-span-2">
+                      <label className="text-sm font-medium text-muted-foreground">Description</label>
+                      <div className="text-sm mt-1">{selectedBag.description}</div>
+                    </div>
+                  )}
+                  {selectedBag.imageUrl && (
+                    <div className="col-span-2">
+                      <label className="text-sm font-medium text-muted-foreground">Image URL</label>
+                      <div className="text-xs mt-1 font-mono break-all text-muted-foreground">{selectedBag.imageUrl}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Bag Dialog */}
+      <Dialog open={openEdit} onOpenChange={(open) => { 
+        setOpenEdit(open); 
+        if (!open) {
+          resetForm();
+          setSelectedBag(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-2xl max-h-[95vh] min-h-[400px] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Surprise Bag</DialogTitle>
+            <DialogDescription>Update surprise bag details</DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4">
+            {/* Restaurant Info (Read-only) */}
+            {selectedBag && selectedBag.restaurant && (
+              <div className="space-y-3">
+                <label className="text-sm font-medium">Restaurant</label>
+                <div className="p-3 border rounded-lg bg-muted/50">
+                  <div className="font-medium">{selectedBag.restaurant.restaurantName}</div>
+                  <div className="text-sm text-muted-foreground">{selectedBag.restaurant.userEmail || selectedBag.restaurant.phoneNumber}</div>
+                </div>
+              </div>
+            )}
+
+            {/* Bag Details */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className="text-sm font-medium">Bag Name *</label>
+                <Input value={formB.bagName} onChange={(e) => setFormB({...formB, bagName: e.target.value})} placeholder="e.g., Dinner Surprise Pack" />
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium">Customer Pays (₹) *</label>
+                <Input 
+                  type="number" 
+                  step="0.01"
+                  value={formB.denominationValue} 
+                  onChange={(e) => setFormB({...formB, denominationValue: e.target.value})} 
+                  placeholder="199.00" 
+                />
+                <p className="text-xs text-muted-foreground mt-1">Price customer will pay</p>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium">Actual Worth (₹) *</label>
+                <Input 
+                  type="number" 
+                  step="0.01"
+                  value={formB.actualWorth} 
+                  onChange={(e) => setFormB({...formB, actualWorth: e.target.value})} 
+                  placeholder="399.00" 
+                />
+                <p className="text-xs text-muted-foreground mt-1">Original value of items</p>
+              </div>
+              
+              <div className="col-span-2">
+                <label className="text-sm font-medium">Description</label>
+                <Input value={formB.description} onChange={(e) => setFormB({...formB, description: e.target.value})} placeholder="Brief description of the bag contents" />
+              </div>
+              
+              <div className="col-span-2">
+                <label className="text-sm font-medium">Bag Image</label>
+                <div className="space-y-2">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleImageUpload(file);
+                      }
+                    }}
+                    disabled={uploadingImage}
+                    className="cursor-pointer"
+                  />
+                  {uploadingImage && (
+                    <p className="text-xs text-muted-foreground">Uploading image...</p>
+                  )}
+                  {bagImageUrl && (
+                    <div className="mt-2">
+                      <img 
+                        src={bagImageUrl} 
+                        alt="Bag preview" 
+                        className="w-32 h-32 object-cover rounded-md border"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Image uploaded successfully</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Availability */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Quantity Available *</label>
+                <Input 
+                  type="number" 
+                  value={formB.quantityAvailable} 
+                  onChange={(e) => setFormB({...formB, quantityAvailable: e.target.value})} 
+                  placeholder="10" 
+                />
+                <p className="text-xs text-muted-foreground mt-1">Number of bags available</p>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium">Available Till Date</label>
+                <Input 
+                  type="date" 
+                  value={formB.availableDate} 
+                  onChange={(e) => setFormB({...formB, availableDate: e.target.value})} 
+                />
+                <p className="text-xs text-muted-foreground mt-1">Leave empty for today</p>
+              </div>
+            </div>
+
+            {/* Pickup Time */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Pickup Start Time</label>
+                <Input 
+                  type="time" 
+                  value={formB.pickupStartTime} 
+                  onChange={(e) => setFormB({...formB, pickupStartTime: e.target.value})} 
+                />
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium">Pickup End Time</label>
+                <Input 
+                  type="time" 
+                  value={formB.pickupEndTime} 
+                  onChange={(e) => setFormB({...formB, pickupEndTime: e.target.value})} 
+                />
+              </div>
+            </div>
+
+            {/* Active Status */}
+            <div className="flex items-center space-x-2">
+              <input 
+                type="checkbox" 
+                id="bagActiveEdit" 
+                checked={formB.isActive} 
+                onChange={(e) => setFormB({...formB, isActive: e.target.checked})} 
+                className="h-4 w-4" 
+              />
+              <label htmlFor="bagActiveEdit" className="text-sm font-medium">Bag is Active</label>
+              <p className="text-xs text-muted-foreground">(customers can see and purchase)</p>
+            </div>
+
+            {/* Vegetarian Status */}
+            <div className="flex items-center space-x-2">
+              <input 
+                type="checkbox" 
+                id="bagVegetarianEdit" 
+                checked={formB.isVegetarian} 
+                onChange={(e) => setFormB({...formB, isVegetarian: e.target.checked})} 
+                className="h-4 w-4" 
+              />
+              <label htmlFor="bagVegetarianEdit" className="text-sm font-medium">Vegetarian Bag</label>
+              <p className="text-xs text-muted-foreground">(mark as vegetarian option)</p>
+            </div>
+          </div>
+          
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => { setOpenEdit(false); resetForm(); setSelectedBag(null); }}>Cancel</Button>
+            <Button disabled={editing || !isFormValid()} onClick={handleUpdate}>
+              {editing ? 'Updating...' : 'Update Surprise Bag'}
+            </Button>
+          </div>
+          {!isFormValid() && (
+            <p className="text-xs text-amber-600 text-right mt-2">
+              Please fill all required fields
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

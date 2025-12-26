@@ -182,6 +182,23 @@ export const adminApi = {
     '/bags',
     { method: 'POST', body: JSON.stringify(body) }
   ),
+  updateSurpriseBag: (bagId: string, body: {
+    targetRestaurantId?: string; // admin updating for a specific restaurant
+    bagName?: string;
+    denominationValue?: number;
+    actualWorth?: number;
+    description?: string;
+    imageUrl?: string;
+    quantityAvailable?: number;
+    pickupStartTime?: string; // HH:MM:SS
+    pickupEndTime?: string;   // HH:MM:SS
+    availableDate?: string;  // YYYY-MM-DD
+    isActive?: boolean;
+    isVegetarian?: boolean;
+  }) => apiRequest<{ message: string; bag: any }>(
+    `/bags/${bagId}`,
+    { method: 'PUT', body: JSON.stringify(body) }
+  ),
   // Auth/Registration
   registerPasswordUser: (body: {
     phoneNumber?: string;
