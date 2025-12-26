@@ -199,6 +199,14 @@ export const adminApi = {
     `/bags/${bagId}`,
     { method: 'PUT', body: JSON.stringify(body) }
   ),
+  deleteSurpriseBag: (bagId: string, targetRestaurantId?: string) => 
+    apiRequest<{ message: string }>(
+      `/bags/${bagId}`,
+      { 
+        method: 'DELETE', 
+        body: JSON.stringify({ targetRestaurantId }) 
+      }
+    ),
   // Auth/Registration
   registerPasswordUser: (body: {
     phoneNumber?: string;

@@ -3,7 +3,7 @@ import { adminApi } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, ChevronDown, ChevronRight, Edit } from "lucide-react";
+import { Plus, X, ChevronDown, ChevronRight, Edit, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { apiRequestWithStatus } from "@/lib/utils";
 
@@ -29,6 +29,11 @@ export function SurpriseBags() {
   const [openDetail, setOpenDetail] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [editing, setEditing] = useState(false);
+  
+  // Delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [bagToDelete, setBagToDelete] = useState<{ bag: any; restaurant: any } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   
   // Restaurant dropdown states
   const [allRestaurants, setAllRestaurants] = useState<any[]>([]);
@@ -330,6 +335,38 @@ export function SurpriseBags() {
     }
   };
 
+  const openDeleteDialog = (bag: any, restaurant: any) => {
+    setBagToDelete({ bag, restaurant });
+    setDeleteConfirm(true);
+  };
+
+  const handleDelete = async () => {
+    if (!bagToDelete) return;
+    
+    try {
+      setDeleting(true);
+      const restaurantId = bagToDelete.restaurant.restaurantId || bagToDelete.restaurant.id;
+      await adminApi.deleteSurpriseBag(bagToDelete.bag.bagId, restaurantId);
+      
+      // Refresh list
+      setGroupedRestaurants(await adminApi.getGroupedSurpriseBags());
+      setDeleteConfirm(false);
+      setBagToDelete(null);
+      toast.success("Surprise bag deleted successfully!", {
+        position: "top-right",
+        autoClose: 3000,
+      });
+    } catch (error: any) {
+      console.error('Delete failed', error);
+      toast.error(error?.message || "Failed to delete surprise bag", {
+        position: "top-right",
+        autoClose: 3000,
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="grid gap-4">
       <Card className="rounded-2xl">
@@ -475,8 +512,9 @@ export function SurpriseBags() {
                         <label className="text-sm font-medium">Description</label>
                         <Input value={formB.description} onChange={(e) => setFormB({...formB, description: e.target.value})} placeholder="Brief description of the bag contents" />
                       </div>
-                      
-                      <div className="col-span-2">
+
+                      {/* TODO: Bag Image - Disabled for now */}
+                      {/* <div className="col-span-2">
                         <label className="text-sm font-medium">Bag Image</label>
                         <div className="space-y-2">
                           <Input
@@ -505,7 +543,7 @@ export function SurpriseBags() {
                             </div>
                           )}
                         </div>
-                      </div>
+                      </div> */}
                     </div>
 
                     {/* Availability */}
@@ -679,17 +717,30 @@ export function SurpriseBags() {
                                 {bag.availableDate ? new Date(bag.availableDate).toLocaleDateString() : 'N/A'}
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditDialog(bag, restaurant);
-                                  }}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditDialog(bag, restaurant);
+                                    }}
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openDeleteDialog(bag, restaurant);
+                                    }}
+                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -726,9 +777,11 @@ export function SurpriseBags() {
                     }}
                   />
                 ) : (
-                  <div className="w-full max-w-md h-64 flex items-center justify-center border rounded-lg bg-muted/30">
-                    <p className="text-sm text-muted-foreground">No image available</p>
-                  </div>
+                  // TODO: Bag Image - Disabled for now
+                  // <div className="w-full max-w-md h-64 flex items-center justify-center border rounded-lg bg-muted/30">
+                  //   <p className="text-sm text-muted-foreground">No image available</p>
+                  // </div>
+                  <div></div>
                 )}
               </div>
               
@@ -982,6 +1035,31 @@ export function SurpriseBags() {
               Please fill all required fields
             </p>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirm} onOpenChange={setDeleteConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Surprise Bag</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{bagToDelete?.bag.bagName || 'this surprise bag'}"? 
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? 'Deleting...' : 'Delete Surprise Bag'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
